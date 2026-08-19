@@ -51,5 +51,8 @@ async def root():
 @app.get("/health", tags=["Health"])
 async def health():
     return {"status": "ok"}
+@app.head("/health", tags=["Health"])
+async def health():
+    return {"status": "ok"}
 if __name__ =="__main__":
     uvicorn.run("main:app", port=8000, reload=True)
