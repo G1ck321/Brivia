@@ -1,81 +1,306 @@
 /**
- * Brivia — Open Payments Transfer (single clean script)
+ * =============================================================================
+ * BRIVIA — Open Payments Transfer (Fully Annotated)
+ * =============================================================================
  *
- * Fixes:
- *   1. "negative receive amount" — uses correct grant + quote flow
- *   2. "pending on receiver" — omits incomingAmount so payment completes on any receipt
+ * WHAT THIS FILE DOES:
+ *   This script sends real money (testnet EUR) from one Interledger wallet
+ *   to another using the Open Payments protocol. It is the core payment
+ *   engine that powers Brivia's healthcare bill contribution system.
  *
- * Usage:
+ * THE FLOW (6 STEPS):
+ *   1. Create an authenticated client (proves who you are)
+ *   2. Create an incoming payment on the RECEIVER's wallet (they agree to receive)
+ *   3. Get a quote from the SENDER's wallet (how much will it cost?)
+ *   4. Request an outgoing payment grant (sender approves the spend)
+ *   5. Execute the outgoing payment (money moves)
+ *   6. Poll until the receiver gets the funds (settlement)
+ *
+ * THREE ROLES:
+ *   CLIENT  — The wallet that authenticates with the SDK (your identity)
+ *   SENDER  — The wallet that pays (money leaves this wallet)
+ *   RECEIVER — The wallet that gets paid (money arrives here)
+ *
+ * USAGE:
  *   node transfer.js <amount> [description]
- *   node transfer.js 100 "Healthcare bill"
+ *   node transfer.js 100 "Healthcare bill contribution"
  *
- * Requires: private1.key in this directory
+ * REQUIREMENTS:
+ *   - private1.key (your wallet's private key, downloaded from Rafiki dashboard)
+ *   - npm install @interledger/open-payments
+ *
+ * =============================================================================
  */
 
-import { createAuthenticatedClient, isFinalizedGrantWithAccessToken, isPendingGrant } from "@interledger/open-payments";
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 1: IMPORTS & SETUP
+// ─────────────────────────────────────────────────────────────────────────────
+// We import the Open Payments SDK. It's a CommonJS module, so we use
+// the default import pattern and destructure what we need.
+//
+// WHY CommonJS? The @interledger/open-payments package doesn't export
+// named ESM exports. Using `import pkg from "..."` then destructuring
+// avoids the "Named export not found" error.
+
+import pkg from "@interledger/open-payments";
 import { readFileSync } from "node:fs";
 
-// --- Config ---
-const PRIVATE_KEY = readFileSync("private1.key", "utf8");
-const KEY_ID = "7081bbed-1e3e-416d-b4b5-981b3993be68";
+// Destructure only the functions we actually use from the SDK:
+//   createAuthenticatedClient — creates an SDK client tied to your wallet
+const { createAuthenticatedClient } = pkg;
 
-// CLIENT = who authenticates (must be a wallet you own)
-// SENDER = who pays
-// RECEIVER = who gets paid
-const CLIENT_WALLET  = "https://ilp.interledger-test.dev/euroanna";
-const SENDER_WALLET  = "https://ilp.interledger-test.dev/euroanna";
-const RECEIVER_WALLET = "https://ilp.interledger-test.dev/practice";
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 2: TLS CONFIGURATION
+// ─────────────────────────────────────────────────────────────────────────────
+// The Interledger testnet uses self-signed TLS certificates.
+// Node.js (unlike curl -k) rejects self-signed certs by default.
+// Setting this env var disables certificate verification so our
+// requests to auth.interledger-test.dev don't fail with "fetch failed".
+//
+// WARNING: Only do this for TESTNET. In production, always verify certs.
 
-const amount = parseInt(process.argv[2] || "100");
-const description = process.argv[3] || "Brivia payment";
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-// --- Step 1: Create authenticated client ---
-console.log(`\nBrivia Transfer: ${amount} EUR from euroanna -> practice\n`);
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 3: WALLET CONFIGURATION
+// ─────────────────────────────────────────────────────────────────────────────
+// These are your three wallet addresses on the Interledger testnet.
+//
+// WHERE TO FIND THEM:
+//   - Go to https://rafiki.money/dashboard
+//   - Each wallet you create has a public URL like:
+//     https://ilp.interledger-test.dev/<wallet-name>
+//
+// KEY_ID and PRIVATE_KEY:
+//   - Created in the Rafiki dashboard under "API Keys"
+//   - The private key is downloaded once and stored as private1.key
+//   - The key_id identifies which key you're using
+//   - The key must be registered to the CLIENT wallet (not sender/receiver)
+
+const PRIVATE_KEY = readFileSync("private1.key", "utf8");  // Your wallet's private key file
+const KEY_ID = "7081bbed-1e3e-416d-b4b5-981b3993be68";    // Your API key ID
+
+// CLIENT = The wallet whose identity the SDK uses to authenticate.
+//          The PRIVATE_KEY must belong to this wallet.
+//          The SDK uses this wallet's auth server to get access tokens.
+//
+// SENDER = The wallet that pays. Money will be debited from here.
+//          The user must approve the outgoing payment via browser redirect.
+//
+// RECEIVER = The wallet that receives payment. An incoming payment is
+//            created on this wallet to accept the funds.
+
+const CLIENT_WALLET   = "https://ilp.interledger-test.dev/practice";
+const SENDER_WALLET   = "https://ilp.interledger-test.dev/euroanna";
+const RECEIVER_WALLET = "https://ilp.interledger-test.dev/41fe8576";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 4: CLI ARGUMENTS
+// ─────────────────────────────────────────────────────────────────────────────
+// Parse command-line arguments: amount and optional description.
+//
+// EXAMPLES:
+//   node transfer.js 100
+//   node transfer.js 250 "Hospital bill for surgery"
+
+const rawAmount = process.argv[2] || "100";        // Amount in EUR (human-readable)
+const description = process.argv[3] || "Brivia payment";  // Payment description
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 5: CREATE AUTHENTICATED CLIENT
+// ─────────────────────────────────────────────────────────────────────────────
+// This is the MOST IMPORTANT step. It creates an SDK client that:
+//   1. Downloads the wallet's OpenAPI spec (auto-discovery)
+//   2. Registers your private key with the auth server
+//   3. Can make authenticated requests on behalf of CLIENT_WALLET
+//
+// WHAT HAPPENS UNDER THE HOOD:
+//   - SDK fetches https://ilp.interledger-test.dev/practice (the wallet)
+//   - From the wallet, it gets the authServer URL
+//   - It fetches the OpenAPI spec from the auth server
+//   - It registers your key as a "client" with that auth server
+//   - Now any request it makes is signed with your key
+//
+// validateResponses: false
+//   - Disables response validation against the OpenAPI spec
+//   - Useful when the testnet returns unexpected response shapes
 
 const client = await createAuthenticatedClient({
-  walletAddressUrl: CLIENT_WALLET,
-  keyId: KEY_ID,
-  privateKey: PRIVATE_KEY,
+  walletAddressUrl: CLIENT_WALLET,  // Which wallet am I?
+  keyId: KEY_ID,                     // Which API key?
+  privateKey: PRIVATE_KEY,           // The actual private key content
+  validateResponses: false,          // Skip OpenAPI response validation
 });
 
-// --- Step 2: Resolve wallet addresses ---
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 6: RESOLVE WALLET ADDRESSES
+// ─────────────────────────────────────────────────────────────────────────────
+// Each wallet URL is an "Open Payments wallet address" — a JSON document
+// that contains metadata about the wallet:
+//
+// {
+//   id: "https://ilp.interledger-test.dev/euroanna",
+//   publicName: "ANNA EURO",
+//   assetCode: "EUR",          ← What currency this wallet uses
+//   assetScale: 2,             ← Decimal places (2 = cents, so 100 = 1.00 EUR)
+//   authServer: "https://auth.interledger-test.dev/...",
+//   resourceServer: "https://ilp.interledger-test.dev/..."
+// }
+//
+// We need the full wallet objects to get:
+//   - authServer URL (for requesting grants)
+//   - resourceServer URL (for creating payments)
+//   - assetCode and assetScale (for amount formatting)
+
 const receiver = await client.walletAddress.get({ url: RECEIVER_WALLET });
 const sender   = await client.walletAddress.get({ url: SENDER_WALLET });
 
-console.log(`Sender:   ${sender.publicName} (${sender.id})`);
-console.log(`Receiver: ${receiver.publicName} (${receiver.id})\n`);
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 7: AMOUNT SCALING
+// ─────────────────────────────────────────────────────────────────────────────
+// Open Payments uses "base units" (like cents), not decimal amounts.
+//
+// EXAMPLE:
+//   assetScale = 2 (EUR has 2 decimal places)
+//   User says: "100 EUR"
+//   In base units: 100 * 10^2 = 10000 (i.e., 10000 cents)
+//
+// This is critical! If you send "100" with assetScale=2,
+// you're actually sending 1.00 EUR, not 100 EUR.
 
-// --- Step 3: Create incoming payment on RECEIVER ---
-// KEY FIX: Do NOT set incomingAmount — this lets the payment complete
-// as soon as any funds arrive, instead of waiting for the full amount.
-// The connector charges ~4% fees, so setting incomingAmount causes
-// "completed: false" because the full amount never arrives.
+const amountInBaseUnits = (
+  parseFloat(rawAmount) * Math.pow(10, sender.assetScale)
+).toString();
+
+console.log(
+  `Transferring ${rawAmount} EUR (${amountInBaseUnits} base units)...`
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 1: CREATE INCOMING PAYMENT (on receiver's wallet)
+// ─────────────────────────────────────────────────────────────────────────────
+// An "incoming payment" is like a bank account saying:
+//   "I'm expecting to receive money. Here's my reference."
+//
+// Before we can create one, we need a GRANT from the receiver's auth server.
+// A grant is an access token that says "you have permission to do X".
+//
+// GRANT REQUEST:
+//   We ask the receiver's auth server for permission to:
+//     - "create" incoming payments (make a new payment slot)
+//     - "read" incoming payments (check if money arrived)
+//     - "complete" incoming payments (force-close the payment)
+//
+// The auth server responds with an access token we use for subsequent API calls.
+
 const incGrant = await client.grant.request(
+  // URL of the auth server (we got this from the wallet address)
   { url: receiver.authServer },
+
+  // What permissions we're requesting
   {
     access_token: {
-      access: [{ type: "incoming-payment", actions: ["create", "read"] }],
+      access: [
+        {
+          type: "incoming-payment",     // What type of resource
+          actions: ["create", "read", "complete"],  // What we want to do
+        },
+      ],
     },
-  },
+  }
 );
-if (!isFinalizedGrantWithAccessToken(incGrant)) {
-  throw new Error("Failed to get incoming payment grant");
-}
+
+// Now create the actual incoming payment on the receiver's resource server.
+// NOTE: We do NOT set incomingAmount here. Why?
+//   - The ILP connector charges ~4% fees
+//   - If we request 100 EUR but only 96 EUR arrives (after fees),
+//     the payment stays "incomplete" forever
+//   - By NOT setting incomingAmount, the payment completes
+//     as soon as ANY money arrives
+//
+// The incomingPayment object returned looks like:
+//   {
+//     id: "https://.../incoming-payments/abc123",
+//     walletAddress: "https://ilp.interledger-test.dev/41fe8576",
+//     receivedAmount: { value: "0", assetCode: "EUR", assetScale: 2 },
+//     completed: false,
+//     ...
+//   }
 
 const incomingPayment = await client.incomingPayment.create(
   { url: receiver.resourceServer, accessToken: incGrant.access_token.value },
   {
-    walletAddress: receiver.id,
-    // NO incomingAmount — payment completes on any receipt
-    metadata: { description },
-  },
+    walletAddress: receiver.id,     // Which wallet receives?
+    metadata: { description },      // What's it for?
+    // No incomingAmount — completes on any receipt
+  }
 );
-console.log(`Incoming payment: ${incomingPayment.id}`);
 
-// --- Step 4: Request outgoing payment grant (interactive) ---
-// KEY FIX: Request a non-interactive grant first using a separate wallet for the client,
-// OR use the sender wallet and handle the interactive redirect.
-// Since CLIENT == SENDER, the grant request goes to the sender's auth server.
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 2: GET A QUOTE (from sender's wallet)
+// ─────────────────────────────────────────────────────────────────────────────
+// A quote answers: "If I send X amount, how much will the receiver get?"
+//
+// WHY QUOTES MATTER:
+//   - ILP connectors charge fees (typically 2-4%)
+//   - The quote tells you EXACTLY what will be debited and received
+//   - You need a quote ID to create the outgoing payment
+//   - Without a quote, you'd get "negative receive amount" errors
+//
+// We need a SEPARATE grant for quotes (different permission scope).
+
+const quoteGrant = await client.grant.request(
+  { url: sender.authServer },
+  {
+    access_token: {
+      access: [{ type: "quote", actions: ["create", "read"] }],
+    },
+  }
+);
+
+// Create the quote. This contacts the sender's connector which:
+//   1. Checks if sender → receiver route exists
+//   2. Calculates fees
+//   3. Returns exact debit/receive amounts
+//
+// Quote result example:
+//   {
+//     debitAmount:  { value: "10400", assetCode: "EUR", assetScale: 2 },
+//     receiveAmount: { value: "10000", assetCode: "EUR", assetScale: 2 },
+//     method: "ilp"
+//   }
+//   (Sender pays 104.00 EUR, receiver gets 100.00 EUR, 4 EUR fee)
+
+const quote = await client.quote.create(
+  { url: sender.resourceServer, accessToken: quoteGrant.access_token.value },
+  {
+    walletAddress: sender.id,     // Who's paying?
+    receiver: incomingPayment.id, // Where's it going? (the incoming payment URL)
+    debitAmount: {                // How much to send?
+      value: amountInBaseUnits,
+      assetCode: sender.assetCode,
+      assetScale: sender.assetScale,
+    },
+    method: "ilp",                // Payment method (Interledger Protocol)
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 3: REQUEST OUTGOING PAYMENT GRANT (interactive approval)
+// ─────────────────────────────────────────────────────────────────────────────
+// This is the "authorization" step — like entering your PIN at an ATM.
+//
+// The sender's auth server requires the wallet owner to APPROVE the payment.
+// This is done via browser redirect:
+//   1. We request a grant with interact.start: ["redirect"]
+//   2. Auth server gives us a redirect URL
+//   3. User opens that URL in a browser
+//   4. User approves/rejects the payment
+//   5. Auth server redirects back with a confirmation
+//   6. We poll the "continue" URL until the grant is finalized
+//
+// The limit (quote.debitAmount) ensures the grant can't be used for
+// more than the quoted amount — prevents overspending.
 
 const outGrant = await client.grant.request(
   { url: sender.authServer },
@@ -84,123 +309,152 @@ const outGrant = await client.grant.request(
       access: [
         {
           type: "outgoing-payment",
-          actions: ["create"],
-          limits: {
-            debitAmount: {
-              assetCode: sender.assetCode,
-              assetScale: sender.assetScale,
-              value: (amount * 2).toString(),  // extra headroom for fees
-            },
-          },
-          identifier: sender.id,
+          actions: ["create"],           // Permission to create outgoing payments
+          limits: { debitAmount: quote.debitAmount },  // Max spend = quote amount
+          identifier: sender.id,         // Which wallet this applies to
         },
       ],
     },
-    interact: { start: ["redirect"] },
-  },
+    interact: { start: ["redirect"] },   // Require browser-based approval
+  }
 );
 
-if (!isPendingGrant(outGrant)) {
-  console.log("Grant was immediately finalized (non-interactive)");
-  // This can happen if you already approved recently
+// Show the approval URL to the user
+if (outGrant.interact?.redirect) {
+  console.log(`Approve payment here: ${outGrant.interact.redirect}`);
 }
 
-const approveUrl = outGrant.interact?.redirect;
-if (approveUrl) {
-  console.log(`\nOpen this URL to approve the payment:\n  ${approveUrl}\n`);
-} else {
-  console.log("Grant already approved or no redirect URL.\n");
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 4: WAIT FOR APPROVAL & FINALIZE GRANT
+// ─────────────────────────────────────────────────────────────────────────────
+// After the user approves in the browser, we need to "continue" the grant.
+//
+// HOW IT WORKS:
+//   1. User approves → auth server sets a flag internally
+//   2. We poll the "continue" URI every second
+//   3. Auth server returns the finalized grant (with access token)
+//   4. We use that access token to create the outgoing payment
+//
+// If the grant was already approved (e.g., cached), it's finalized immediately.
+// We check by looking for `access_token` in the response.
 
-// --- Step 5: Wait for approval ---
 let finalizedGrant = null;
 
-if (isPendingGrant(outGrant)) {
-  console.log("Waiting for approval... (approve in browser)\n");
+if (outGrant.interact?.redirect) {
+  // Interactive flow — wait for user to approve in browser
+  // Poll every 1 second for up to 2 minutes (120 attempts)
   for (let i = 0; i < 120; i++) {
-    await new Promise((r) => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, 1000));  // Wait 1 second
+
     try {
-      const result = await client.grant.continue({
-        url: outGrant.continue.uri,
-        accessToken: outGrant.continue.access_token.value,
+      const res = await client.grant.continue({
+        url: outGrant.continue.uri,                    // The "continue" endpoint
+        accessToken: outGrant.continue.access_token.value,  // Continuation token
       });
-      if (isFinalizedGrantWithAccessToken(result)) {
-        finalizedGrant = result;
+
+      // If we get back an access_token, the grant is finalized
+      if (res.access_token) {
+        finalizedGrant = res;
         break;
       }
     } catch {
-      // Not ready yet
+      // Grant not ready yet — user hasn't approved yet
+      // This is normal, keep polling
     }
   }
 } else {
+  // Non-interactive flow — grant was immediately finalized
+  // (can happen if you recently approved a similar grant)
   finalizedGrant = outGrant;
 }
 
-if (!finalizedGrant) {
+// Safety check — if we never got a finalized grant, abort
+if (!finalizedGrant || !finalizedGrant.access_token) {
   console.log("Timed out waiting for approval.");
   process.exit(1);
 }
-console.log("Approved!\n");
 
-// --- Step 6: Get a quote first, then create outgoing payment ---
-// KEY FIX: Create a quote first to get the exact receiveAmount,
-// then create the outgoing payment referencing the quote.
-// This avoids the "negative receive amount" error.
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 5: EXECUTE OUTGOING PAYMENT
+// ─────────────────────────────────────────────────────────────────────────────
+// Now we create the actual outgoing payment. This is where money moves.
+//
+// WHAT HAPPENS:
+//   1. SDK sends POST to sender's resource server
+//   2. Resource server validates the quote ID and access token
+//   3. The ILP connector initiates the payment
+//   4. Money flows: sender → connector → receiver
+//   5. The outgoingPayment object is returned immediately
+//      (settlement may still be in progress)
+//
+// The outgoingPayment contains:
+//   - id: URL of this payment (for future reference)
+//   - debitAmount: what was taken from sender
+//   - receiveAmount: what will arrive at receiver (from the quote)
+//   - sentAmount: how much has been sent so far (may be 0 initially)
+//   - failed: whether the payment failed
 
-const quote = await client.quote.create(
-  { url: sender.resourceServer, accessToken: finalizedGrant.access_token.value },
-  {
-    walletAddress: sender.id,
-    incomingPayment: incomingPayment.id,
-  },
-);
-console.log(`Quote:`);
-console.log(`  Debit:   ${quote.debitAmount.value} ${quote.debitAmount.assetCode}`);
-console.log(`  Receive: ${quote.receiveAmount.value} ${quote.receiveAmount.assetCode}\n`);
-
-// Now create outgoing payment using the quote
 const outgoingPayment = await client.outgoingPayment.create(
   { url: sender.resourceServer, accessToken: finalizedGrant.access_token.value },
   {
-    walletAddress: sender.id,
-    quoteId: quote.id,
-    metadata: { description },
-  },
+    walletAddress: sender.id,   // Which wallet is paying?
+    quoteId: quote.id,          // Reference the quote we got earlier
+    metadata: { description },  // Payment description
+  }
 );
 
-console.log(`Outgoing payment created: ${outgoingPayment.id}`);
-console.log(`  Debit:   ${outgoingPayment.debitAmount.value} ${outgoingPayment.debitAmount.assetCode}`);
-console.log(`  Receive: ${outgoingPayment.receiveAmount.value} ${outgoingPayment.receiveAmount.assetCode}`);
-console.log(`  Failed:  ${outgoingPayment.failed}\n`);
+console.log(`Outgoing Payment Created: ${outgoingPayment.id}`);
 
-// --- Step 7: Poll for settlement ---
-console.log("Polling for settlement...\n");
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 6: POLL FOR SETTLEMENT
+// ─────────────────────────────────────────────────────────────────────────────
+// ILP payments are asynchronous — the money doesn't arrive instantly.
+// We poll the incoming payment to check if funds have arrived.
+//
+// SETTLEMENT PROCESS:
+//   1. Sender's connector creates ILP packets with the money
+//   2. Packets hop through the ILP network (connector to connector)
+//   3. Receiver's connector accepts the packets
+//   4. Each accepted packet adds to receivedAmount
+//   5. Once receivedAmount > 0, we force-complete the payment
+//
+// We poll every 2 seconds for up to 40 seconds (20 attempts).
+// On testnet, settlement usually takes 2-10 seconds.
 
-for (let i = 0; i < 30; i++) {
-  await new Promise((r) => setTimeout(r, 2000));
-  try {
-    const updated = await client.incomingPayment.get({
+for (let i = 0; i < 20; i++) {
+  await new Promise((r) => setTimeout(r, 2000));  // Wait 2 seconds
+
+  // Check the incoming payment status
+  const updated = await client.incomingPayment.get({
+    url: incomingPayment.id,
+    accessToken: incGrant.access_token.value,
+  });
+
+  const received = updated.receivedAmount?.value || "0";
+
+  // Log progress
+  console.log(
+    `Poll ${i + 1}: Received ${received} base units`
+  );
+
+  if (parseInt(received) > 0) {
+    // Money arrived! Force the incoming payment to complete state.
+    // Without this, the payment might stay "open" waiting for more.
+    await client.incomingPayment.complete({
       url: incomingPayment.id,
       accessToken: incGrant.access_token.value,
     });
-    const received = updated.receivedAmount?.value || "0";
-    process.stdout.write(
-      `  ${i + 1}: received=${received} ${receiver.assetCode} completed=${updated.completed}\r`
+
+    // Convert back to human-readable amount
+    const humanAmount = parseInt(received) / Math.pow(10, receiver.assetScale);
+    console.log(
+      `\nSuccess! Received: ${humanAmount} ${receiver.assetCode}`
     );
-    if (updated.completed) {
-      console.log(`\n\nDone! Received ${received} ${receiver.assetCode}`);
-      process.exit(0);
-    }
-    if (parseInt(received) > 0 && !updated.completed) {
-      // Funds arrived but incomingAmount not reached (we didn't set one, so this shouldn't happen)
-      console.log(`\n\nFunds received: ${received} ${receiver.assetCode} (payment settling)`);
-      process.exit(0);
-    }
-  } catch {
-    process.stdout.write(`  ${i + 1}: polling...\r`);
+    process.exit(0);
   }
 }
 
-console.log("\n\nSettlement not confirmed within timeout.");
-console.log("Check: https://ilp.interledger-test.dev/practice");
+// If we get here, settlement didn't happen within the timeout
+console.log("\nSettlement not confirmed within timeout.");
+console.log("Check the receiver wallet manually.");
 process.exit(1);
