@@ -2,7 +2,6 @@
 
 import { Route, Switch } from "wouter";
 import { BriviaProviders } from "./providers";
-import { Toaster } from "sonner";
 import Home from "@/components/HomePage";
 import ProviderDashboard from "@/components/ProviderDashboard";
 import PatientDashboard from "@/components/PatientDashboard";
@@ -11,7 +10,6 @@ import PublicPayment from "@/components/PublicPayment";
 export default function AppRouter() {
   return (
     <BriviaProviders>
-      <Toaster position="top-right" richColors />
       <Switch>
         <Route path="/" component={Home} />
         <Route path="/provider/create" component={ProviderDashboard} />

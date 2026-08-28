@@ -6,7 +6,7 @@
  */
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import {
   ArrowRight,
@@ -18,7 +18,8 @@ import { BriviaMark } from "@/components/BriviaAppShell";
 import { login, register, type User } from "@/lib/api";
 
 export default function HomePage() {
-  const [, navigate] = useLocation();
+  const [, setLocation] = useLocation();
+  const navigate = useCallback((path: string) => setLocation(path), [setLocation]);
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
