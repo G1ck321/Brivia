@@ -28,6 +28,15 @@ class PaymentProvider:
         raise NotImplementedError
 
 
+# --- Platform fee ---
+PLATFORM_FEE_PERCENT = 2  # 2% goes to Brivia
+
+
+def calculate_platform_fee(amount_minor: int) -> int:
+    """Calculate the Brivia platform fee (2% of the contribution)."""
+    return max(int(amount_minor * PLATFORM_FEE_PERCENT / 100), 1)  # minimum 1 unit
+
+
 class MockPaymentProvider(PaymentProvider):
     """
     Mock payment provider for demo/MVP mode.
@@ -130,6 +139,10 @@ async def initiate_contribution(
             f"Amount exceeds remaining balance of {bill['remaining_balance_minor']} {bill['currency']}."
         )
 
+    # --- Calculate platform fee (2% to Brivia) ---
+    platform_fee = calculate_platform_fee(data.amount_minor)
+    net_amount = data.amount_minor - platform_fee
+
     # --- Create payment record ---
     payment_id = str(secrets.token_hex(16))
     payment_ref = _generate_payment_reference()
@@ -178,11 +191,12 @@ async def initiate_contribution(
         external_id = None
 
     # --- Update payment record ---
-    new_amount_paid = bill["amount_paid_minor"] + data.amount_minor
-    new_remaining = bill["remaining_balance_minor"] - data.amount_minor
+    # Bill tracks net amount (after platform fee) as the amount paid
+    new_amount_paid = bill["amount_paid_minor"] + net_amount
+    new_remaining = bill["remaining_balance_minor"] - net_amount
 
     if payment_status == PaymentStatus.COMPLETED:
-        # Update bill
+        # Update bill — only count net amount (after platform fee) toward the bill
         new_bill_status = BillStatus.PAID.value if new_remaining <= 0 else BillStatus.PARTIALLY_PAID.value
 
         db.table("bills").update({
@@ -191,6 +205,16 @@ async def initiate_contribution(
             "status": new_bill_status,
             "updated_at": now,
         }).eq("id", bill_id).execute()
+
+        # Record platform fee for Brivia
+        if platform_fee > 0:
+            _log_audit(db, None, "PLATFORM_FEE", "bill", bill_id, {
+                "payment_id": payment_id,
+                "gross_amount": data.amount_minor,
+                "platform_fee": platform_fee,
+                "net_amount": net_amount,
+                "currency": bill["currency"],
+            })
 
         # Audit: payment completed
         _log_audit(db, contributor_id, "PAYMENT_COMPLETED", "payment", payment_id, {

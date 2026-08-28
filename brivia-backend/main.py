@@ -20,7 +20,7 @@ app = FastAPI(
     description="Brivia Healthcare Payment Coordination API",
     docs_url="/docs",
     redoc_url="/redoc",
-    redirect_slashes=False,
+    redirect_slashes=False,  # Prevent 307 redirects that strip Authorization headers
 )
 
 # --- CORS ---
