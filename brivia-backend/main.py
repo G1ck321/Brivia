@@ -20,6 +20,7 @@ app = FastAPI(
     description="Brivia Healthcare Payment Coordination API",
     docs_url="/docs",
     redoc_url="/redoc",
+    redirect_slashes=False,
 )
 
 # --- CORS ---
@@ -51,8 +52,12 @@ async def root():
 @app.get("/health", tags=["Health"])
 async def health():
     return {"status": "ok"}
+
+
 @app.head("/health", tags=["Health"])
-async def health():
+async def health_head():
     return {"status": "ok"}
-if __name__ =="__main__":
+
+
+if __name__ == "__main__":
     uvicorn.run("main:app", port=8000, reload=True)
