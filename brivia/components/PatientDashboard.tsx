@@ -5,7 +5,7 @@
  */
 "use client";
 import { useEffect, useState } from "react";
-import { Link } from "wouter";
+import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import {
   Check,

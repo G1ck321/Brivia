@@ -6,8 +6,8 @@
  */
 "use client";
 
-import { FormEvent, useState, useCallback } from "react";
-import { useLocation } from "wouter";
+import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   HeartHandshake,
@@ -18,8 +18,7 @@ import { BriviaMark } from "@/components/BriviaAppShell";
 import { login, register, type User } from "@/lib/api";
 
 export default function HomePage() {
-  const [, setLocation] = useLocation();
-  const navigate = useCallback((path: string) => setLocation(path), [setLocation]);
+  const router = useRouter();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -48,11 +47,10 @@ export default function HomePage() {
         });
       }
 
-      // Redirect based on role
       if (result.user.role === "provider") {
-        navigate("/provider/create");
+        router.push("/provider/create");
       } else {
-        navigate("/patient");
+        router.push("/patient");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed");

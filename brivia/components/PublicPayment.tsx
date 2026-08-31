@@ -4,8 +4,10 @@
  * Fetches bill info from FastAPI backend via share token.
  * Submits payment to backend which processes through Open Payments.
  */
+"use client";
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { Link, useRoute } from "wouter";
+import Link from "next/link";
+import { useParams } from "next/navigation";
 import {
   Check,
   ChevronLeft,
@@ -32,8 +34,8 @@ function billProgress(bill: PublicBill): number {
 }
 
 export default function PublicPayment() {
-  const [, params] = useRoute("/pay/:token");
-  const token = params?.token ?? "";
+  const params = useParams();
+  const token = (params?.token as string) ?? "";
 
   const [bill, setBill] = useState<PublicBill | null>(null);
   const [loading, setLoading] = useState(true);

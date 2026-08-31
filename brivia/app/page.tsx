@@ -1,9 +1,5 @@
-"use client";
-
-import dynamic from "next/dynamic";
-
-const AppRouter = dynamic(() => import("./router"), { ssr: false });
+import HomePage from "@/components/HomePage";
 
 export default function Page() {
-  return <AppRouter />;
+  return <HomePage />;
 }

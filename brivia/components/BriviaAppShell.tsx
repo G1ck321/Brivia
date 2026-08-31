@@ -1,8 +1,11 @@
 /**
  * Brivia Living Ledger style: forest contour rail, warm paper surfaces, icon-led care-finance navigation.
  */
+"use client";
+
 import type { ReactNode } from "react";
-import { Link, useLocation } from "wouter";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   Bell,
   ClipboardPlus,
@@ -15,7 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const markUrl = "/logobriv.png";
+const markUrl = "/briv.jpg";
 
 const navItems = [
   { label: "Overview", href: "/", icon: LayoutDashboard },
@@ -39,7 +42,7 @@ export function BriviaMark({ withName = true, compact = false }: { withName?: bo
 }
 
 export function BriviaAppShell({ children }: { children: ReactNode }) {
-  const [location] = useLocation();
+  const pathname = usePathname();
 
   return (
     <div className="min-h-screen bg-[#f4f6ef] text-[#163b30]">
@@ -60,7 +63,7 @@ export function BriviaAppShell({ children }: { children: ReactNode }) {
           <nav className="flex flex-col items-center gap-3" aria-label="Workspace routes">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = item.href === "/" ? location === "/" : location.startsWith(item.href);
+              const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
               return (
                 <Link
                   key={item.label}
@@ -88,15 +91,15 @@ export function BriviaAppShell({ children }: { children: ReactNode }) {
       <main className="app-main">{children}</main>
 
       <nav className="mobile-nav" aria-label="Mobile navigation">
-        <Link href="/" className={cn("mobile-nav-item", location === "/" && "active")}>
+        <Link href="/" className={cn("mobile-nav-item", pathname === "/" && "active")}>
           <LayoutDashboard size={19} />
           <span>Home</span>
         </Link>
-        <Link href="/provider/create" className={cn("mobile-nav-item create", location === "/provider/create" && "active")}>
+        <Link href="/provider/create" className={cn("mobile-nav-item create", pathname === "/provider/create" && "active")}>
           <ClipboardPlus size={19} />
           <span>Bill</span>
         </Link>
-        <Link href="/patient" className={cn("mobile-nav-item", location === "/patient" && "active")}>
+        <Link href="/patient" className={cn("mobile-nav-item", pathname === "/patient" && "active")}>
           <HeartHandshake size={19} />
           <span>Share</span>
         </Link>
