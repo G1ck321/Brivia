@@ -32,6 +32,7 @@ services:
     name: brivia-op-server
     runtime: node
     plan: starter
+    healthCheckPath: /health
     buildCommand: cd open-payments-server && npm install
     startCommand: cd open-payments-server && node server.js
     envVars:
