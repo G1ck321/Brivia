@@ -7,7 +7,7 @@
 import OpenPayments from "@interledger/open-payments";
 import { readFileSync } from "node:fs";
 
-const { createAuthenticatedClient, isFinalizedGrantWithAccessToken, isPendingGrant } = OpenPayments;
+const { createAuthenticatedClient, isFinalizedGrant, isPendingGrant } = OpenPayments;
 
 const PRIVATE_KEY = readFileSync("private1.key", "utf8");
 const KEY_ID = "7081bbed-1e3e-416d-b4b5-981b3993be68";
@@ -42,7 +42,7 @@ const incGrant = await client.grant.request(
   { url: receiver.authServer },
   { access_token: { access: [{ type: "incoming-payment", actions: ["create", "read"] }] } },
 );
-if (!isFinalizedGrantWithAccessToken(incGrant)) throw new Error("inc grant failed");
+if (!isFinalizedGrant(incGrant)) throw new Error("inc grant failed");
 
 const incoming = await client.incomingPayment.create(
   { url: receiver.resourceServer, accessToken: incGrant.access_token.value },
@@ -80,7 +80,7 @@ for (let i = 0; i < 120; i++) {
   await new Promise(r => setTimeout(r, 1000));
   try {
     const r = await client.grant.continue({ url: outGrant.continue.uri, accessToken: outGrant.continue.access_token.value });
-    if (isFinalizedGrantWithAccessToken(r)) { finalGrant = r; break; }
+    if (isFinalizedGrant(r)) { finalGrant = r; break; }
   } catch {}
 }
 if (!finalGrant) { console.log("❌ Timeout"); process.exit(1); }

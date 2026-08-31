@@ -18,7 +18,7 @@ import http from "node:http";
 import OpenPayments from "@interledger/open-payments";
 import { readFileSync } from "node:fs";
 
-const { createAuthenticatedClient, isFinalizedGrantWithAccessToken, isPendingGrant } = OpenPayments;
+const { createAuthenticatedClient, isFinalizedGrant, isPendingGrant } = OpenPayments;
 
 // --- Config (override via env vars) ---
 const PORT = process.env.OP_SERVER_PORT || 3100;
@@ -136,7 +136,7 @@ async function setupIncomingPayment(receiverWalletUrl, amountMinor, reference) {
     },
   );
 
-  if (!isFinalizedGrantWithAccessToken(grant)) {
+  if (!isFinalizedGrant(grant)) {
     throw new Error("Failed to get incoming payment grant");
   }
 
@@ -216,7 +216,7 @@ async function finalizeAndPay(paymentId, continueUri, continueToken, senderWalle
     accessToken: continueToken,
   });
 
-  if (!isFinalizedGrantWithAccessToken(grant)) {
+  if (!isFinalizedGrant(grant)) {
     throw new Error("Grant not finalized");
   }
 
@@ -271,7 +271,7 @@ async function pollSettlement(incomingPaymentUrl, maxAttempts = 30, intervalMs =
         },
       );
 
-      if (isFinalizedGrantWithAccessToken(grant)) {
+      if (isFinalizedGrant(grant)) {
         const payment = await c.incomingPayment.get({
           url: incomingPaymentUrl,
           accessToken: grant.access_token.value,

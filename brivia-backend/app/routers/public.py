@@ -112,20 +112,24 @@ async def initiate_open_payments(share_token: str, data: OpenPaymentsInitiateReq
     # Get or create incoming payment for this bill
     incoming_payment_id = bill.get("external_payment_id")
     if not incoming_payment_id:
-        # Need to set up incoming payment first
-        # For now, we'll use the receiver wallet from settings
+        # Set up incoming payment via OP server (Node.js SDK handles auth correctly)
         receiver_wallet = settings.OP_RECEIVING_WALLET_URL or "https://ilp.interledger-test.dev/practice"
+        op_url = settings.OP_SERVER_URL or "http://localhost:3100"
 
         try:
-            from app.services.open_payments_provider import get_open_payments_provider
-            provider = get_open_payments_provider()
-
-            incoming_result = await provider.setup_incoming_payment(
-                receiver_wallet_url=receiver_wallet,
-                amount_minor=bill["amount_minor"],
-                reference=bill["public_bill_id"],
-            )
-            incoming_payment_id = incoming_result["id"]
+            import httpx
+            async with httpx.AsyncClient(timeout=30.0) as hc:
+                resp = await hc.post(
+                    f"{op_url}/setup-incoming",
+                    json={
+                        "receiver_wallet_url": receiver_wallet,
+                        "amount_minor": bill["amount_minor"],
+                        "reference": bill["public_bill_id"],
+                    },
+                )
+                resp.raise_for_status()
+                incoming_result = resp.json()
+            incoming_payment_id = incoming_result["incoming_payment_id"]
 
             # Store on bill
             db.table("bills").update({
