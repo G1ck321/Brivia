@@ -138,3 +138,27 @@ class AuditLogResponse(BaseModel):
     resource_id: str
     metadata: dict | None = None
     created_at: str
+
+
+# --- Open Payments ---
+
+class OpenPaymentsInitiateRequest(BaseModel):
+    """Request to initiate an Open Payments flow."""
+    amount_minor: int = Field(gt=0)
+    contributor_name: str = Field(default="Anonymous", max_length=200)
+    sender_wallet_url: str = Field(description="Contributor's wallet URL")
+
+
+class OpenPaymentsInitiateResponse(BaseModel):
+    """Response with redirect URL for wallet approval."""
+    payment_id: str
+    redirect_url: str
+    message: str
+
+
+class OpenPaymentsCallbackResponse(BaseModel):
+    """Response after payment is finalized."""
+    payment: PaymentResponse
+    bill_status: str
+    received_amount: int
+    message: str

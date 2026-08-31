@@ -18,7 +18,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { BriviaMark } from "@/components/BriviaAppShell";
-import { getPublicBill, contributeToBill, initiateOutgoingGrant, type PublicBill, type Payment } from "@/lib/api";
+import { getPublicBill, contributeToBill, initiateOpenPayments, type PublicBill, type Payment } from "@/lib/api";
 
 function formatMoney(minor: number): string {
   return `₦${(minor / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
@@ -43,6 +43,8 @@ export default function PublicPayment() {
 
   const [contributorName, setContributorName] = useState("");
   const [amount, setAmount] = useState("");
+  const [walletUrl, setWalletUrl] = useState("");
+  const [paymentMode, setPaymentMode] = useState<"mock" | "openpayments">("mock");
   const [error, setError] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [payment, setPayment] = useState<Payment | null>(null);
@@ -88,23 +90,22 @@ export default function PublicPayment() {
     }
     setIsProcessing(true);
     try {
-      // Try Open Payments flow first (redirect to wallet approval)
-      try {
-        const grantResult = await initiateOutgoingGrant(
-          bill.public_bill_id,
-          "https://ilp.interledger-test.dev/euroanna", // sender wallet
-          amountMinor
-        );
-        if (grantResult.interact_redirect) {
-          // Redirect user to wallet provider for approval
-          window.location.href = grantResult.interact_redirect;
-          return;
-        }
-      } catch {
-        // Fall back to mock payment if Open Payments not configured
+      if (paymentMode === "openpayments" && walletUrl.trim()) {
+        // Open Payments flow — redirect to wallet for approval
+        const result = await initiateOpenPayments(token, {
+          amount_minor: amountMinor,
+          contributor_name: contributorName || "Anonymous",
+          sender_wallet_url: walletUrl.trim(),
+        });
+        // Store payment_id so callback page can find it
+        localStorage.setItem("brivia_op_payment_id", result.payment_id);
+        localStorage.setItem("brivia_op_share_token", token);
+        // Redirect user to wallet provider for approval
+        window.location.href = result.redirect_url;
+        return;
       }
 
-      // Mock payment flow (fallback)
+      // Mock payment flow
       const result = await contributeToBill(token, {
         amount_minor: amountMinor,
         contributor_name: contributorName || "Anonymous",
@@ -198,6 +199,27 @@ export default function PublicPayment() {
                   />
                 </div>
               </label>
+              <div className="form-two-col">
+                <label>Payment method
+                  <select
+                    value={paymentMode}
+                    onChange={(e) => setPaymentMode(e.target.value as "mock" | "openpayments")}
+                    style={{ display: "block", width: "100%", minHeight: 46, marginTop: 7, padding: "0 13px", border: "1px solid #d8e4da", borderRadius: 13, color: "#163b30", background: "#fcfdfb", fontSize: ".9rem", fontWeight: 600 }}
+                  >
+                    <option value="mock">Demo (Mock Payment)</option>
+                    <option value="openpayments">Open Payments / ILP</option>
+                  </select>
+                </label>
+                {paymentMode === "openpayments" && (
+                  <label>Your wallet URL
+                    <input
+                      value={walletUrl}
+                      onChange={(e) => setWalletUrl(e.target.value)}
+                      placeholder="https://ilp.interledger-test.dev/your-wallet"
+                    />
+                  </label>
+                )}
+              </div>
               {error && <p className="form-error" role="alert">{error}</p>}
               <button className="primary-button full public-pay-button" type="submit" disabled={isProcessing}>
                 {isProcessing ? (
@@ -207,8 +229,16 @@ export default function PublicPayment() {
                 )}
               </button>
               <p className="payment-form-note">
-                <LockKeyhole size={14} /> Payment is processed through Open Payments / Interledger.
+                <LockKeyhole size={14} /> {paymentMode === "openpayments"
+                  ? "You'll be redirected to your wallet to approve the payment."
+                  : "Demo mode — simulated payment for testing."
+                }
               </p>
+              {paymentMode === "openpayments" && (
+                <p style={{ marginTop: 8, fontSize: ".75rem", color: "#81948b" }}>
+                  Already approved? <Link href={`/pay/${token}/callback`} style={{ color: "#0e5f4d", textDecoration: "underline" }}>Check payment status</Link>
+                </p>
+              )}
             </form>
           )}
         </section>

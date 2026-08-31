@@ -92,7 +92,7 @@ const KEY_ID = "7081bbed-1e3e-416d-b4b5-981b3993be68";    // Your API key ID
 
 const CLIENT_WALLET   = "https://ilp.interledger-test.dev/practice";
 const SENDER_WALLET   = "https://ilp.interledger-test.dev/euroanna";
-const RECEIVER_WALLET = "https://ilp.interledger-test.dev/41fe8576";
+const RECEIVER_WALLET = "https://ilp.interledger-test.dev/practice";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SECTION 4: CLI ARGUMENTS

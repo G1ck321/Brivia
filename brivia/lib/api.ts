@@ -239,6 +239,38 @@ export async function initiateOutgoingGrant(publicBillId: string, senderWalletUr
   });
 }
 
+// --- Open Payments Flow ---
+
+export async function initiateOpenPayments(
+  shareToken: string,
+  data: {
+    amount_minor: number;
+    contributor_name: string;
+    sender_wallet_url: string;
+  }
+) {
+  return apiRequest<{
+    payment_id: string;
+    redirect_url: string;
+    message: string;
+  }>(`/public/bills/${shareToken}/pay/open-payments`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getOpenPaymentsCallback(
+  shareToken: string,
+  paymentId: string
+) {
+  return apiRequest<{
+    payment: Payment;
+    bill_status: string;
+    received_amount: number;
+    message: string;
+  }>(`/public/bills/${shareToken}/pay/callback?payment_id=${paymentId}`);
+}
+
 export async function pollSettlement(billId: string) {
   return apiRequest<{
     status: string;
