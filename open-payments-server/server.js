@@ -97,8 +97,8 @@ async function handleRequest(req, res) {
 
     // --- POST /finalize-payment ---
     if (url.pathname === "/finalize-payment") {
-      const { payment_id, continue_uri, continue_token, sender_wallet_url, quote_id, description } = body;
-      const result = await finalizeAndPay(continue_uri, continue_token, sender_wallet_url, quote_id, description);
+      const { continue_uri, continue_token, sender_wallet_url, incoming_payment_id, amount_minor, description } = body;
+      const result = await finalizeAndPay(continue_uri, continue_token, sender_wallet_url, incoming_payment_id, amount_minor, description);
       respond(res, 200, result);
       return;
     }
@@ -241,9 +241,9 @@ async function initiateOutgoingPayment(senderWalletUrl, incomingPaymentUrl, amou
   };
 }
 
-async function finalizeAndPay(continueUri, continueToken, senderWalletUrl, quoteId, description) {
+async function finalizeAndPay(continueUri, continueToken, senderWalletUrl, incomingPaymentUrl, amountMinor, description) {
   const c = await getClient();
-  console.log(`[finalize] quote=${quoteId}`);
+  console.log(`[finalize] incoming=${incomingPaymentUrl} amount=${amountMinor}`);
 
   // Finalize grant after user approval
   const grant = await c.grant.continue({
@@ -258,7 +258,8 @@ async function finalizeAndPay(continueUri, continueToken, senderWalletUrl, quote
 
   const wallet = await c.walletAddress.get({ url: senderWalletUrl });
 
-  // Execute outgoing payment using quote ID (matches transfer.js Step 5)
+  // Execute outgoing payment using incomingPayment + debitAmount
+  // (matches test-transfer.js which works correctly on testnet)
   const payment = await c.outgoingPayment.create(
     {
       url: wallet.resourceServer,
@@ -266,12 +267,18 @@ async function finalizeAndPay(continueUri, continueToken, senderWalletUrl, quote
     },
     {
       walletAddress: wallet.id,
-      quoteId: quoteId,
+      incomingPayment: incomingPaymentUrl,
+      debitAmount: {
+        assetCode: wallet.assetCode,
+        assetScale: wallet.assetScale,
+        value: amountMinor.toString(),
+      },
       metadata: { description: description || "Brivia bill contribution" },
     },
   );
 
   console.log(`[finalize] outgoing payment OK id=${payment.id}`);
+  console.log(`[finalize] debit=${payment.debitAmount?.value} receive=${payment.receiveAmount?.value}`);
 
   return {
     payment_id: payment.id,

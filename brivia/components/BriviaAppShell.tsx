@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const markUrl = "/briv.jpg";
+const markUrl = "/logobriv.png";
 
 const navItems = [
   { label: "Overview", href: "/", icon: LayoutDashboard },

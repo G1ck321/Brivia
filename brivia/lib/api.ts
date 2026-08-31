@@ -267,6 +267,9 @@ export async function getOpenPaymentsCallback(
     payment: Payment;
     bill_status: string;
     received_amount: number;
+    gross_amount: number;
+    platform_fee: number;
+    net_amount: number;
     message: string;
   }>(`/public/bills/${shareToken}/pay/callback?payment_id=${paymentId}`);
 }

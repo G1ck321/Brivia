@@ -261,7 +261,7 @@ async def open_payments_callback(
     metadata = audit_result.data[0]["metadata"]
     continue_uri = metadata["continue_uri"]
     continue_token = metadata["continue_token"]
-    quote_id = metadata["quote_id"]
+    incoming_payment_id = metadata["incoming_payment_id"]
     sender_wallet_url = metadata["sender_wallet_url"]
 
     # Finalize the grant via OP server
@@ -276,7 +276,8 @@ async def open_payments_callback(
                     "continue_uri": continue_uri,
                     "continue_token": continue_token,
                     "sender_wallet_url": sender_wallet_url,
-                    "quote_id": quote_id,
+                    "incoming_payment_id": incoming_payment_id,
+                    "amount_minor": payment["amount_minor"],
                     "description": "Brivia bill contribution",
                 },
             )
@@ -353,5 +354,8 @@ async def open_payments_callback(
         ),
         bill_status=new_bill_status,
         received_amount=int(payment_result.get("receive_amount", {}).get("value", 0)),
+        gross_amount=payment["amount_minor"],
+        platform_fee=platform_fee,
+        net_amount=net_amount,
         message="Payment completed successfully via Open Payments",
     )

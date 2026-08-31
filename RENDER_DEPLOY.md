@@ -137,7 +137,21 @@ Only needed if you want real ILP transfers in production.
 ```
 NODE_TLS_REJECT_UNAUTHORIZED=0
 PORT=3100
+OP_WALLET_ADDRESS_URL=https://ilp.interledger-test.dev/practice
+OP_KEY_ID=7081bbed-1e3e-416d-b4b5-981b3993be68
 ```
+
+> **⚠️ Security note:** `NODE_TLS_REJECT_UNAUTHORIZED=0` is required because the Interledger testnet uses self-signed TLS certificates. This is safe for testnet only. In production with real wallets, remove this and use proper certificate verification.
+>
+> **⚠️ Private key:** Render doesn't support file mounts. You need to either:
+> - Store the private key as an env var and write it to disk at startup
+> - Or embed it in the repo (fine for testnet, NOT for production)
+>
+> **Quick workaround — add to Start Command:**
+> ```
+> cd open-payments-server && echo "$OP_PRIVATE_KEY" > private1.key && node server.js
+> ```
+> Then add `OP_PRIVATE_KEY` as a Render env var with the full private key content.
 
 ### Update Backend Settings
 
@@ -160,15 +174,24 @@ OP_SERVER_URL=https://brivia-op.onrender.com
 
 ## Deployment Checklist
 
+### Demo Mode (mock payments)
 - [ ] Supabase project created with tables from `supabase_migration.sql`
-- [ ] Backend deployed with all env vars
+- [ ] Backend deployed with `PAYMENT_PROVIDER=mock`
 - [ ] Database seeded (`python seed.py`)
 - [ ] Frontend deployed with `NEXT_PUBLIC_API_URL` pointing to backend
 - [ ] Login test: `provider@brivia.app` / `password123`
 - [ ] Bill creation test
 - [ ] Payment link share test (open in incognito)
-- [ ] Contribution test
-- [ ] (Optional) Open Payments server deployed
+- [ ] Mock contribution test
+
+### Production Mode (real ILP transfers)
+- [ ] All demo mode items above
+- [ ] Open Payments server deployed with `NODE_TLS_REJECT_UNAUTHORIZED=0`
+- [ ] Private key embedded (via env var workaround above)
+- [ ] Backend env vars include `OP_SERVER_URL` and `OP_RECEIVING_WALLET_URL`
+- [ ] Backend env vars set `PAYMENT_PROVIDER=openpayments`
+- [ ] Test: create bill → copy payment link → select Open Payments → approve in wallet
+- [ ] Test: verify funds arrive on receiver wallet via https://ilp.interledger-test.dev/practice
 
 ---
 

@@ -1,6 +1,6 @@
 /**
  * Brivia Public Payment Page
- * 
+ *
  * Fetches bill info from FastAPI backend via share token.
  * Submits payment to backend which processes through Open Payments.
  */
@@ -18,7 +18,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { BriviaMark } from "@/components/BriviaAppShell";
-import { getPublicBill, contributeToBill, initiateOpenPayments, getOpenPaymentsCallback, type PublicBill, type Payment } from "@/lib/api";
+import { getPublicBill, contributeToBill, initiateOpenPayments, type PublicBill, type Payment } from "@/lib/api";
 
 function formatMoney(minor: number): string {
   return `₦${(minor / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
@@ -45,8 +45,6 @@ export default function PublicPayment() {
   const [amount, setAmount] = useState("");
   const [walletUrl, setWalletUrl] = useState("");
   const [paymentMode, setPaymentMode] = useState<"mock" | "openpayments">("mock");
-  const [opPaymentId, setOpPaymentId] = useState("");
-  const [opPolling, setOpPolling] = useState(false);
   const [error, setError] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [payment, setPayment] = useState<Payment | null>(null);
@@ -71,61 +69,6 @@ export default function PublicPayment() {
     );
   }
 
-  if (opPolling) {
-    return (
-      <div className="public-page">
-        <header className="public-header">
-          <Link href="/" className="public-brand"><BriviaMark /></Link>
-          <div className="secure-header-note"><Loader2 className="animate-spin" size={15} /> Waiting for approval…</div>
-        </header>
-        <main className="min-h-screen flex flex-col items-center justify-center gap-4">
-          <Loader2 className="animate-spin text-[#0e5f4d]" size={40} />
-          <h2 style={{ color: "#163b30" }}>Approve the payment in the wallet tab</h2>
-          <p style={{ color: "#6d8178", maxWidth: 420, textAlign: "center", lineHeight: 1.6 }}>
-            A wallet approval page opened in a new tab. Approve the payment there, then come back here — we'll detect it automatically.
-          </p>
-          <button
-            className="outline-button"
-            onClick={() => {
-              setOpPolling(false);
-              setError("");
-            }}
-            style={{ marginTop: 8 }}
-          >
-            Cancel
-          </button>
-        </main>
-      </div>
-    );
-  }
-
-  // Poll for Open Payments completion
-  useEffect(() => {
-    if (!opPolling || !opPaymentId || !token) return;
-    let attempts = 0;
-    const maxAttempts = 60; // 2 minutes
-    let active = true;
-
-    async function poll() {
-      try {
-        const result = await getOpenPaymentsCallback(token, opPaymentId);
-        if (!active) return;
-        setPayment(result.payment);
-        setOpPolling(false);
-      } catch {
-        attempts++;
-        if (active && attempts < maxAttempts) {
-          setTimeout(poll, 2000);
-        } else if (active) {
-          setOpPolling(false);
-          setError("Payment timed out. Check your wallet and try again.");
-        }
-      }
-    }
-    poll();
-    return () => { active = false; };
-  }, [opPolling, opPaymentId, token]);
-
   if (notFound || !bill) {
     return <InvalidLink />;
   }
@@ -148,18 +91,17 @@ export default function PublicPayment() {
     setIsProcessing(true);
     try {
       if (paymentMode === "openpayments" && walletUrl.trim()) {
-        // Open Payments flow — open wallet approval in new tab,
-        // poll from this tab until payment settles
+        // Open Payments flow — get redirect URL, store payment_id, redirect to wallet
         const result = await initiateOpenPayments(token, {
           amount_minor: amountMinor,
           contributor_name: contributorName || "Anonymous",
           sender_wallet_url: walletUrl.trim(),
         });
-        // Open wallet approval in new tab
-        window.open(result.redirect_url, "_blank");
-        // Start polling for payment completion
-        setOpPaymentId(result.payment_id);
-        setOpPolling(true);
+        // Store payment_id in localStorage so callback page can find it
+        localStorage.setItem("brivia_op_payment_id", result.payment_id);
+        localStorage.setItem("brivia_op_share_token", token);
+        // Redirect to wallet approval page
+        window.location.href = result.redirect_url;
         return;
       }
 
@@ -183,6 +125,7 @@ export default function PublicPayment() {
         billId={bill.public_bill_id}
         payment={payment}
         remaining={Math.max(remaining - payment.amount_minor, 0)}
+        token={token}
       />
     );
   }
@@ -292,7 +235,11 @@ export default function PublicPayment() {
                   : "Demo mode — simulated payment for testing."
                 }
               </p>
-
+              {paymentMode === "openpayments" && (
+                <p style={{ marginTop: 8, fontSize: ".75rem", color: "#81948b" }}>
+                  Already approved? <Link href={`/pay/${token}/callback`} style={{ color: "#0e5f4d", textDecoration: "underline" }}>Check payment status</Link>
+                </p>
+              )}
             </form>
           )}
         </section>
@@ -301,36 +248,63 @@ export default function PublicPayment() {
   );
 }
 
-function Receipt({ billId, payment, remaining }: { billId: string; payment: Payment; remaining: number }) {
+function Receipt({ billId, payment, remaining, token }: { billId: string; payment: Payment; remaining: number; token: string }) {
+  const netAmount = Math.round(payment.amount_minor * 0.98);
+  const platformFee = payment.amount_minor - netAmount;
   return (
     <div className="public-page receipt-page">
       <header className="public-header">
         <Link href="/" className="public-brand"><BriviaMark /></Link>
-        <div className="secure-header-note"><ShieldCheck size={15} /> Receipt confirmed</div>
+        <div className="secure-header-note"><ShieldCheck size={15} /> Payment confirmed</div>
       </header>
       <main className="receipt-layout">
         <section className="receipt-card">
-          <div className="receipt-success-mark"><Check size={32} /></div>
-          <p className="eyebrow">Contribution recorded</p>
-          <h1>Thank you for helping with care.</h1>
-          <p className="receipt-intro">Your payment has been verified and recorded against this bill.</p>
-          <div className="receipt-total">
-            <span>Contribution</span>
-            <strong>{formatMoney(payment.amount_minor)}</strong>
+          <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#dcf0e4", display: "grid", placeItems: "center", marginBottom: 16 }}>
+            <Check size={36} color="#0e5f4d" strokeWidth={3} />
           </div>
-          <div className="receipt-details">
-            <div><span>Bill ID</span><strong>{billId}</strong></div>
-            <div><span>Payment reference</span><strong>{payment.payment_reference}</strong></div>
-            <div><span>Contributor</span><strong>{payment.contributor_name}</strong></div>
-            <div><span>Verified at</span><strong>{new Date(payment.created_at).toLocaleString()}</strong></div>
+          <p className="eyebrow">Payment successful</p>
+          <h1 style={{ fontSize: "1.6rem", marginBottom: 8 }}>Thank you, {payment.contributor_name}!</h1>
+          <p className="receipt-intro" style={{ maxWidth: 420 }}>
+            Your <strong>{formatMoney(payment.amount_minor)}</strong> contribution has been recorded against this healthcare bill.
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 24, marginBottom: 20 }}>
+            <div style={{ padding: 16, borderRadius: 16, background: "#0e5f4d", color: "white" }}>
+              <p style={{ margin: 0, fontSize: ".68rem", color: "#c7e4d5", textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 800 }}>You contributed</p>
+              <strong style={{ fontSize: "1.4rem", marginTop: 4, display: "block" }}>{formatMoney(payment.amount_minor)}</strong>
+            </div>
+            <div style={{ padding: 16, borderRadius: 16, background: "#f5f8f1" }}>
+              <p style={{ margin: 0, fontSize: ".68rem", color: "#72877c", textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 800 }}>Applied to bill</p>
+              <strong style={{ fontSize: "1.4rem", marginTop: 4, display: "block", color: "#0e5f4d" }}>{formatMoney(netAmount)}</strong>
+            </div>
           </div>
-          <div className="receipt-balance">
-            <HeartHandshake size={19} />
-            <span>New bill balance: <strong>{formatMoney(remaining)}</strong></span>
+          <div style={{ padding: 16, borderRadius: 16, background: "#f5f8f1" }}>
+            <p style={{ margin: 0, fontSize: ".72rem", fontWeight: 800, color: "#72877c", textTransform: "uppercase", letterSpacing: ".08em" }}>Platform fee</p>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: ".85rem" }}>
+              <span style={{ color: "#6d8178" }}>Brivia (2%)</span>
+              <strong style={{ color: "#99733e" }}>{formatMoney(platformFee)}</strong>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: ".85rem" }}>
+              <span style={{ color: "#6d8178" }}>Net to bill</span>
+              <strong style={{ color: "#0e5f4d" }}>{formatMoney(netAmount)}</strong>
+            </div>
           </div>
-          <div className="receipt-actions">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 20 }}>
+            <div style={{ fontSize: ".78rem" }}>
+              <span style={{ color: "#81948b" }}>Bill ID</span><br/>
+              <strong style={{ fontSize: ".75rem" }}>{billId}</strong>
+            </div>
+            <div style={{ fontSize: ".78rem" }}>
+              <span style={{ color: "#81948b" }}>Reference</span><br/>
+              <strong style={{ fontSize: ".75rem" }}>{payment.payment_reference}</strong>
+            </div>
+          </div>
+          <div style={{ marginTop: 20, padding: 14, borderRadius: 14, background: "#dcf0e4", display: "flex", alignItems: "center", gap: 10 }}>
+            <HeartHandshake size={18} color="#0e5f4d" />
+            <span style={{ fontSize: ".82rem", color: "#163b30" }}>Bill balance updated: <strong>{formatMoney(remaining)}</strong> remaining</span>
+          </div>
+          <div className="receipt-actions" style={{ marginTop: 24 }}>
             <button type="button" className="outline-button" onClick={() => window.print()}>Print receipt</button>
-            <Link href="/" className="primary-button">View updated ledger</Link>
+            <Link href={`/pay/${token}`} className="primary-button">Back to bill</Link>
           </div>
         </section>
       </main>

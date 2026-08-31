@@ -161,4 +161,7 @@ class OpenPaymentsCallbackResponse(BaseModel):
     payment: PaymentResponse
     bill_status: str
     received_amount: int
+    gross_amount: int
+    platform_fee: int
+    net_amount: int
     message: str
