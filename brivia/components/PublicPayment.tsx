@@ -48,7 +48,18 @@ export default function PublicPayment() {
   const [error, setError] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [payment, setPayment] = useState<Payment | null>(null);
+  const [hasPendingPayment, setHasPendingPayment] = useState(false);
   const idempotencyKey = useRef(`idem-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+
+  useEffect(() => {
+    // Detect if user returned from wallet approval
+    if (typeof window !== "undefined") {
+      const pendingPaymentId = localStorage.getItem("brivia_op_payment_id");
+      if (pendingPaymentId) {
+        setHasPendingPayment(true);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (!token) return;
@@ -170,6 +181,37 @@ export default function PublicPayment() {
               </div>
             </div>
           </div>
+          {hasPendingPayment && (
+            <div style={{ marginBottom: 20, padding: 18, borderRadius: 16, background: "#fff8e1", border: "2px solid #f9a825", display: "flex", alignItems: "flex-start", gap: 14 }}>
+              <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#f9a825", display: "grid", placeItems: "center", flexShrink: 0 }}>
+                <Loader2 size={22} color="#fff" className="animate-spin" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: 0, fontWeight: 700, fontSize: ".95rem", color: "#5d4037" }}>Waiting for your confirmation</p>
+                <p style={{ margin: "4px 0 0", fontSize: ".82rem", color: "#795548" }}>
+                  You approved this payment in your wallet. Tap the button below to confirm and complete it.
+                </p>
+                <Link
+                  href={`/pay/${token}/callback`}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginTop: 12,
+                    padding: "12px 24px",
+                    borderRadius: 12,
+                    background: "#0e5f4d",
+                    color: "white",
+                    fontWeight: 700,
+                    fontSize: ".9rem",
+                    textDecoration: "none",
+                  }}
+                >
+                  <Check size={18} /> Confirm payment now
+                </Link>
+              </div>
+            </div>
+          )}
           {bill.status === "PAID" ? (
             <div className="funded-message">
               <CircleCheckBig size={22} />
