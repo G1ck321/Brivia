@@ -2,10 +2,13 @@
   "name": "brivia-open-payments-server",
   "version": "0.1.0",
   "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "transfer": "NODE_TLS_REJECT_UNAUTHORIZED=0 node transfer.js"
+    "transfer": "node transfer.js"
   },
   "dependencies": {
     "@interledger/open-payments": "^6.0.0"

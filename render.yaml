@@ -1,0 +1,54 @@
+# Render Blueprint — Brivia
+# Deploy all 3 services with: render blueprints apply
+
+services:
+  # ── Backend API ──────────────────────────────────────
+  - type: web
+    name: brivia-api
+    runtime: python
+    plan: starter
+    buildCommand: cd brivia-backend && pip install -r requirements.txt
+    startCommand: cd brivia-backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: https://brivia-frontend.onrender.com
+      - key: PAYMENT_PROVIDER
+        value: openpayments
+      - key: OP_SERVER_URL
+        value: https://brivia-op-server.onrender.com
+      - key: OP_RECEIVING_WALLET_URL
+        value: https://ilp.interledger-test.dev/practice
+
+  # ── Open Payments Server ─────────────────────────────
+  - type: web
+    name: brivia-op-server
+    runtime: node
+    plan: starter
+    buildCommand: cd open-payments-server && npm install
+    startCommand: cd open-payments-server && node server.js
+    envVars:
+      - key: OP_WALLET_ADDRESS_URL
+        value: https://ilp.interledger-test.dev/practice
+      - key: OP_KEY_ID
+        value: 7081bbed-1e3e-416d-b4b5-981b3993be68
+      - key: OP_PRIVATE_KEY
+        sync: false
+      - key: NODE_VERSION
+        value: "20"
+
+  # ── Frontend (Static Site) ───────────────────────────
+  - type: static_site
+    name: brivia-frontend
+    buildCommand: cd brivia && npm install && npm run build
+    staticPublishPath: brivia/.next/static
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        value: https://brivia-api.onrender.com

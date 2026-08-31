@@ -16,7 +16,9 @@
 
 import http from "node:http";
 import OpenPayments from "@interledger/open-payments";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 // Testnet uses self-signed TLS — must disable verification
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
@@ -24,9 +26,26 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 const { createAuthenticatedClient, isFinalizedGrant, isPendingGrant } = OpenPayments;
 
 // --- Config (override via env vars) ---
-const PORT = process.env.OP_SERVER_PORT || 3100;
-const PRIVATE_KEY_PATH = process.env.OP_PRIVATE_KEY_PATH || "private1.key";
+const PORT = process.env.PORT || process.env.OP_SERVER_PORT || 3100;
 const KEY_ID = process.env.OP_KEY_ID || "7081bbed-1e3e-416d-b4b5-981b3993be68";
+
+// Private key: support env var (Render) or file (local dev)
+function getPrivateKey() {
+  // Option 1: OP_PRIVATE_KEY env var (for Render / cloud deploy)
+  if (process.env.OP_PRIVATE_KEY) {
+    console.log("Using private key from OP_PRIVATE_KEY env var");
+    return process.env.OP_PRIVATE_KEY;
+  }
+  // Option 2: Local file (for local dev)
+  const keyPath = process.env.OP_PRIVATE_KEY_PATH || "private1.key";
+  if (existsSync(keyPath)) {
+    console.log(`Using private key from file: ${keyPath}`);
+    return readFileSync(keyPath, "utf8");
+  }
+  throw new Error(
+    "No private key found. Set OP_PRIVATE_KEY env var or provide a private1.key file."
+  );
+}
 
 // Store grants in memory (use Redis/DB in production)
 const grantStore = new Map();
@@ -36,7 +55,7 @@ let client = null;
 
 async function getClient() {
   if (client) return client;
-  const privateKey = readFileSync(PRIVATE_KEY_PATH, "utf8");
+  const privateKey = getPrivateKey();
   client = await createAuthenticatedClient({
     walletAddressUrl: process.env.OP_WALLET_ADDRESS_URL || "https://ilp.interledger-test.dev/practice",
     keyId: KEY_ID,
@@ -59,7 +78,7 @@ async function handleRequest(req, res) {
     return;
   }
 
-  const url = new URL(req.url, `http://localhost:${PORT}`);
+  const url = new URL(req.url, `http://0.0.0.0:${PORT}`);
 
   try {
     // Health check
@@ -364,7 +383,7 @@ function respond(res, statusCode, data) {
 
 // --- Start server ---
 const server = http.createServer(handleRequest);
-server.listen(PORT, () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`Brivia Open Payments server running on port ${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/health`);
+  console.log(`Health check: http://0.0.0.0:${PORT}/health`);
 });

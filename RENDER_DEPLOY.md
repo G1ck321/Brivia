@@ -52,6 +52,8 @@ SUPABASE_SERVICE_KEY=your-service-role-key
 JWT_SECRET_KEY=generate-a-secure-random-string
 CORS_ORIGINS=https://brivia-frontend.onrender.com
 PAYMENT_PROVIDER=mock
+OP_SERVER_URL=https://brivia-op-server.onrender.com
+OP_RECEIVING_WALLET_URL=https://ilp.interledger-test.dev/practice
 ```
 
 ### Seed the Database
@@ -135,23 +137,15 @@ Only needed if you want real ILP transfers in production.
 ### Environment Variables
 
 ```
-NODE_TLS_REJECT_UNAUTHORIZED=0
-PORT=3100
 OP_WALLET_ADDRESS_URL=https://ilp.interledger-test.dev/practice
 OP_KEY_ID=7081bbed-1e3e-416d-b4b5-981b3993be68
+OP_PRIVATE_KEY=<paste your full private key here>
+NODE_VERSION=20
 ```
 
-> **⚠️ Security note:** `NODE_TLS_REJECT_UNAUTHORIZED=0` is required because the Interledger testnet uses self-signed TLS certificates. This is safe for testnet only. In production with real wallets, remove this and use proper certificate verification.
+> **⚠️ Security note:** `NODE_TLS_REJECT_UNAUTHORIZED=0` is hardcoded in server.js for testnet only. In production with real wallets, remove the hardcoded line and set it as a Render env var.
 >
-> **⚠️ Private key:** Render doesn't support file mounts. You need to either:
-> - Store the private key as an env var and write it to disk at startup
-> - Or embed it in the repo (fine for testnet, NOT for production)
->
-> **Quick workaround — add to Start Command:**
-> ```
-> cd open-payments-server && echo "$OP_PRIVATE_KEY" > private1.key && node server.js
-> ```
-> Then add `OP_PRIVATE_KEY` as a Render env var with the full private key content.
+> **⚠️ Private key:** Set `OP_PRIVATE_KEY` as a Render env var with the full private key content (the file contents of `private1.key`). The server reads it from the env var on Render, or from the file when running locally.
 
 ### Update Backend Settings
 
