@@ -20,14 +20,29 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-// Testnet uses self-signed TLS — must disable verification
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+// NOTE: NODE_TLS_REJECT_UNAUTHORIZED should NOT be disabled in production.
+// Only disable for local testnet testing if needed, via env var:
+if (process.env.NODE_TLS_REJECT_UNAUTHORIZED === "0") {
+  console.warn("WARNING: TLS verification is disabled. Do not use in production.");
+}
 
 const { createAuthenticatedClient, isFinalizedGrant, isPendingGrant } = OpenPayments;
 
-// --- Config (override via env vars) ---
+// --- Config (from env vars — mandatory) ---
 const PORT = process.env.PORT || process.env.OP_SERVER_PORT || 3100;
-const KEY_ID = process.env.OP_KEY_ID || "7081bbed-1e3e-416d-b4b5-981b3993be68";
+const KEY_ID = process.env.OP_KEY_ID;
+const WALLET_ADDRESS_URL = process.env.OP_WALLET_ADDRESS_URL;
+const RECEIVING_WALLET_URL = process.env.OP_RECEIVING_WALLET_URL;
+
+if (!KEY_ID) {
+  throw new Error("OP_KEY_ID is required. Set it as an environment variable.");
+}
+if (!WALLET_ADDRESS_URL) {
+  throw new Error("OP_WALLET_ADDRESS_URL is required. Set it as an environment variable.");
+}
+if (!RECEIVING_WALLET_URL) {
+  throw new Error("OP_RECEIVING_WALLET_URL is required. Set it as an environment variable.");
+}
 
 // Private key: support env var (Render) or file (local dev)
 function getPrivateKey() {
@@ -57,7 +72,7 @@ async function getClient() {
   if (client) return client;
   const privateKey = getPrivateKey();
   client = await createAuthenticatedClient({
-    walletAddressUrl: process.env.OP_WALLET_ADDRESS_URL || "https://ilp.interledger-test.dev/practice",
+    walletAddressUrl: WALLET_ADDRESS_URL,
     keyId: KEY_ID,
     privateKey,
     validateResponses: false,
@@ -318,7 +333,7 @@ async function pollSettlement(incomingPaymentUrl, maxAttempts = 30, intervalMs =
       // This requires an access token - in production, store it
       // For now, we'll return the current state
       const wallet = await c.walletAddress.get({
-        url: process.env.OP_RECEIVING_WALLET_URL || "https://ilp.interledger-test.dev/practice",
+        url: RECEIVING_WALLET_URL,
       });
 
       const grant = await c.grant.request(
