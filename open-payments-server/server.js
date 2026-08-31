@@ -49,7 +49,13 @@ function getPrivateKey() {
   // Option 1: OP_PRIVATE_KEY env var (for Render / cloud deploy)
   if (process.env.OP_PRIVATE_KEY) {
     console.log("Using private key from OP_PRIVATE_KEY env var");
-    return process.env.OP_PRIVATE_KEY;
+    // Handle escaped newlines from Render env var paste
+    let key = process.env.OP_PRIVATE_KEY;
+    if (key.includes("\\n")) {
+      key = key.replace(/\\n/g, "\n");
+      console.log("Converted escaped newlines in private key");
+    }
+    return key;
   }
   // Option 2: Local file (for local dev)
   const keyPath = process.env.OP_PRIVATE_KEY_PATH || "private1.key";
