@@ -18,7 +18,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { BriviaMark } from "@/components/BriviaAppShell";
-import { getPublicBill, contributeToBill, type PublicBill, type Payment } from "@/lib/api";
+import { getPublicBill, contributeToBill, initiateOutgoingGrant, type PublicBill, type Payment } from "@/lib/api";
 
 function formatMoney(minor: number): string {
   return `₦${(minor / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
@@ -88,6 +88,23 @@ export default function PublicPayment() {
     }
     setIsProcessing(true);
     try {
+      // Try Open Payments flow first (redirect to wallet approval)
+      try {
+        const grantResult = await initiateOutgoingGrant(
+          bill.public_bill_id,
+          "https://ilp.interledger-test.dev/euroanna", // sender wallet
+          amountMinor
+        );
+        if (grantResult.interact_redirect) {
+          // Redirect user to wallet provider for approval
+          window.location.href = grantResult.interact_redirect;
+          return;
+        }
+      } catch {
+        // Fall back to mock payment if Open Payments not configured
+      }
+
+      // Mock payment flow (fallback)
       const result = await contributeToBill(token, {
         amount_minor: amountMinor,
         contributor_name: contributorName || "Anonymous",

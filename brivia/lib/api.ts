@@ -221,6 +221,24 @@ export async function createOutgoingGrant(billId: string, senderWalletUrl: strin
   });
 }
 
+export async function initiateOutgoingGrant(publicBillId: string, senderWalletUrl: string, amountMinor: number) {
+  // First, we need to get the bill ID from the public bill ID
+  // This is a simplified version - in production, you'd look up the bill properly
+  return apiRequest<{
+    payment_id: string;
+    interact_redirect: string;
+    continue_uri: string;
+    continue_token: string;
+  }>(`/payments/outgoing-grant`, {
+    method: "POST",
+    body: JSON.stringify({
+      public_bill_id: publicBillId,
+      sender_wallet_url: senderWalletUrl,
+      amount_minor: amountMinor,
+    }),
+  });
+}
+
 export async function pollSettlement(billId: string) {
   return apiRequest<{
     status: string;
