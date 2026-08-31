@@ -42,6 +42,8 @@ services:
         value: 7081bbed-1e3e-416d-b4b5-981b3993be68
       - key: OP_PRIVATE_KEY
         sync: false
+      - key: OP_RECEIVING_WALLET_URL
+        value: https://ilp.interledger-test.dev/practice
       - key: NODE_VERSION
         value: "20"
 
