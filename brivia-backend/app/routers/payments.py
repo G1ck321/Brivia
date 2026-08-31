@@ -37,7 +37,7 @@ class FinalizePaymentRequest(BaseModel):
     sender_wallet_url: str
 
 
-@router.post("/", response_model=PaymentResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=PaymentResponse, status_code=status.HTTP_201_CREATED)
 async def create_payment(
     bill_id: str,
     data: PaymentCreate,
@@ -152,3 +152,21 @@ async def poll_settlement(
         return await poll_payment_settlement(bill_id=bill_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+# --- Public outgoing grant endpoint (no auth required) ---
+
+@router.post("/outgoing-grant", response_model=dict)
+async def create_public_outgoing_grant(data: OutgoingGrantRequest):
+    """
+    Create an outgoing payment grant for a contributor (public, no auth).
+    Uses public_bill_id to look up the bill.
+    """
+    from app.services.bill_service import get_bill_by_public_id
+    
+    # This is a simplified lookup - in production, you'd use the share token
+    # For now, we'll need to pass the bill_id directly
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Use the share token endpoint instead."
+    )

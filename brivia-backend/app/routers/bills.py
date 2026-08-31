@@ -17,7 +17,7 @@ from app.services.bill_service import (
 router = APIRouter(prefix="/bills", tags=["Bills"])
 
 
-@router.post("/", response_model=BillResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=BillResponse, status_code=status.HTTP_201_CREATED)
 async def create_new_bill(
     data: BillCreate,
     user: dict = Depends(get_current_user),
@@ -31,7 +31,7 @@ async def create_new_bill(
     return await create_bill(provider_id=user["id"], data=data)
 
 
-@router.get("/", response_model=list[BillResponse])
+@router.get("", response_model=list[BillResponse])
 async def list_my_bills(user: dict = Depends(get_current_user)):
     """List bills for the authenticated user."""
     if user["role"] == "provider":
