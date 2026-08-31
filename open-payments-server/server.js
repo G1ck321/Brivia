@@ -18,6 +18,9 @@ import http from "node:http";
 import OpenPayments from "@interledger/open-payments";
 import { readFileSync } from "node:fs";
 
+// Testnet uses self-signed TLS — must disable verification
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
 const { createAuthenticatedClient, isFinalizedGrant, isPendingGrant } = OpenPayments;
 
 // --- Config (override via env vars) ---
@@ -38,6 +41,7 @@ async function getClient() {
     walletAddressUrl: process.env.OP_WALLET_ADDRESS_URL || "https://ilp.interledger-test.dev/practice",
     keyId: KEY_ID,
     privateKey,
+    validateResponses: false,
   });
   return client;
 }
@@ -85,16 +89,16 @@ async function handleRequest(req, res) {
 
     // --- POST /initiate-outgoing ---
     if (url.pathname === "/initiate-outgoing") {
-      const { sender_wallet_url, amount_minor } = body;
-      const result = await initiateOutgoingPayment(sender_wallet_url, amount_minor);
+      const { sender_wallet_url, incoming_payment_url, amount_minor } = body;
+      const result = await initiateOutgoingPayment(sender_wallet_url, incoming_payment_url, amount_minor);
       respond(res, 200, result);
       return;
     }
 
     // --- POST /finalize-payment ---
     if (url.pathname === "/finalize-payment") {
-      const { payment_id, continue_uri, continue_token, sender_wallet_url, incoming_payment_id, amount_minor, description } = body;
-      const result = await finalizeAndPay(payment_id, continue_uri, continue_token, sender_wallet_url, incoming_payment_id, amount_minor, description);
+      const { payment_id, continue_uri, continue_token, sender_wallet_url, quote_id, description } = body;
+      const result = await finalizeAndPay(continue_uri, continue_token, sender_wallet_url, quote_id, description);
       respond(res, 200, result);
       return;
     }
@@ -113,8 +117,10 @@ async function handleRequest(req, res) {
 
   } catch (err) {
     console.error("Error:", err.message);
+    console.error("Stack:", err.stack);
+    if (err.body) console.error("Body:", JSON.stringify(err.body));
     res.writeHead(500, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: err.message }));
+    res.end(JSON.stringify({ error: err.message, detail: err.body || null }));
   }
 }
 
@@ -122,9 +128,11 @@ async function handleRequest(req, res) {
 
 async function setupIncomingPayment(receiverWalletUrl, amountMinor, reference) {
   const c = await getClient();
+  console.log(`[setup-incoming] receiver=${receiverWalletUrl} amount=${amountMinor}`);
 
   // Get wallet address
   const wallet = await c.walletAddress.get({ url: receiverWalletUrl });
+  console.log(`[setup-incoming] wallet OK authServer=${wallet.authServer}`);
 
   // Request incoming payment grant
   const grant = await c.grant.request(
@@ -135,12 +143,13 @@ async function setupIncomingPayment(receiverWalletUrl, amountMinor, reference) {
       },
     },
   );
+  console.log(`[setup-incoming] grant OK finalized=${isFinalizedGrant(grant)}`);
 
   if (!isFinalizedGrant(grant)) {
     throw new Error("Failed to get incoming payment grant");
   }
 
-  // Create incoming payment
+  // Create incoming payment — no incomingAmount to avoid fee issues
   const incomingPayment = await c.incomingPayment.create(
     {
       url: wallet.resourceServer,
@@ -149,13 +158,9 @@ async function setupIncomingPayment(receiverWalletUrl, amountMinor, reference) {
     {
       walletAddress: wallet.id,
       metadata: { description: `Brivia bill - ${reference}` },
-      incomingAmount: {
-        assetCode: wallet.assetCode,
-        assetScale: wallet.assetScale,
-        value: amountMinor.toString(),
-      },
     },
   );
+  console.log(`[setup-incoming] incomingPayment OK id=${incomingPayment.id}`);
 
   return {
     incoming_payment_id: incomingPayment.id,
@@ -164,15 +169,47 @@ async function setupIncomingPayment(receiverWalletUrl, amountMinor, reference) {
     asset_scale: wallet.assetScale,
     received_amount: incomingPayment.receivedAmount,
     completed: incomingPayment.completed,
-    access_token: grant.access_token.value, // Store for polling
+    access_token: grant.access_token.value,
   };
 }
 
-async function initiateOutgoingPayment(senderWalletUrl, amountMinor) {
+async function initiateOutgoingPayment(senderWalletUrl, incomingPaymentUrl, amountMinor) {
   const c = await getClient();
 
   const wallet = await c.walletAddress.get({ url: senderWalletUrl });
+  console.log(`[initiate-outgoing] sender=${senderWalletUrl} incoming=${incomingPaymentUrl} amount=${amountMinor}`);
 
+  // Step 1: Get a quote from sender (matches transfer.js Step 2)
+  const quoteGrant = await c.grant.request(
+    { url: wallet.authServer },
+    {
+      access_token: {
+        access: [{ type: "quote", actions: ["create", "read"] }],
+      },
+    },
+  );
+
+  if (!isFinalizedGrant(quoteGrant)) {
+    throw new Error("Failed to get quote grant");
+  }
+
+  const quote = await c.quote.create(
+    { url: wallet.resourceServer, accessToken: quoteGrant.access_token.value },
+    {
+      walletAddress: wallet.id,
+      receiver: incomingPaymentUrl,
+      debitAmount: {
+        value: amountMinor.toString(),
+        assetCode: wallet.assetCode,
+        assetScale: wallet.assetScale,
+      },
+      method: "ilp",
+    },
+  );
+
+  console.log(`[initiate-outgoing] quote OK debit=${quote.debitAmount.value} receive=${quote.receiveAmount.value}`);
+
+  // Step 2: Request outgoing payment grant with quote.debitAmount as limit
   const grant = await c.grant.request(
     { url: wallet.authServer },
     {
@@ -181,13 +218,7 @@ async function initiateOutgoingPayment(senderWalletUrl, amountMinor) {
           {
             type: "outgoing-payment",
             actions: ["create"],
-            limits: {
-              debitAmount: {
-                assetCode: wallet.assetCode,
-                assetScale: wallet.assetScale,
-                value: amountMinor.toString(),
-              },
-            },
+            limits: { debitAmount: quote.debitAmount },
             identifier: wallet.id,
           },
         ],
@@ -200,15 +231,19 @@ async function initiateOutgoingPayment(senderWalletUrl, amountMinor) {
     throw new Error("Expected pending grant for outgoing payment");
   }
 
+  console.log(`[initiate-outgoing] grant OK redirect=${grant.interact.redirect}`);
+
   return {
     interact_redirect: grant.interact.redirect,
     continue_uri: grant.continue.uri,
     continue_token: grant.continue.access_token.value,
+    quote_id: quote.id,
   };
 }
 
-async function finalizeAndPay(paymentId, continueUri, continueToken, senderWalletUrl, incomingPaymentId, amountMinor, description) {
+async function finalizeAndPay(continueUri, continueToken, senderWalletUrl, quoteId, description) {
   const c = await getClient();
+  console.log(`[finalize] quote=${quoteId}`);
 
   // Finalize grant after user approval
   const grant = await c.grant.continue({
@@ -219,10 +254,11 @@ async function finalizeAndPay(paymentId, continueUri, continueToken, senderWalle
   if (!isFinalizedGrant(grant)) {
     throw new Error("Grant not finalized");
   }
+  console.log(`[finalize] grant finalized OK`);
 
   const wallet = await c.walletAddress.get({ url: senderWalletUrl });
 
-  // Execute outgoing payment
+  // Execute outgoing payment using quote ID (matches transfer.js Step 5)
   const payment = await c.outgoingPayment.create(
     {
       url: wallet.resourceServer,
@@ -230,15 +266,12 @@ async function finalizeAndPay(paymentId, continueUri, continueToken, senderWalle
     },
     {
       walletAddress: wallet.id,
-      incomingPayment: incomingPaymentId,
-      debitAmount: {
-        assetCode: wallet.assetCode,
-        assetScale: wallet.assetScale,
-        value: amountMinor.toString(),
-      },
+      quoteId: quoteId,
       metadata: { description: description || "Brivia bill contribution" },
     },
   );
+
+  console.log(`[finalize] outgoing payment OK id=${payment.id}`);
 
   return {
     payment_id: payment.id,

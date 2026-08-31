@@ -168,11 +168,12 @@ async def initiate_open_payments(share_token: str, data: OpenPaymentsInitiateReq
         import httpx
         op_url = settings.OP_SERVER_URL or "http://localhost:3100"
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(
                 f"{op_url}/initiate-outgoing",
                 json={
                     "sender_wallet_url": data.sender_wallet_url,
+                    "incoming_payment_url": incoming_payment_id,
                     "amount_minor": data.amount_minor,
                 },
             )
@@ -201,16 +202,13 @@ async def initiate_open_payments(share_token: str, data: OpenPaymentsInitiateReq
         "metadata": {
             "continue_uri": grant_result["continue_uri"],
             "continue_token": grant_result["continue_token"],
+            "quote_id": grant_result["quote_id"],
             "bill_id": bill_id,
             "incoming_payment_id": incoming_payment_id,
             "sender_wallet_url": data.sender_wallet_url,
         },
         "created_at": now,
     }).execute()
-
-    # Build callback URL
-    callback_base = settings.CORS_ORIGINS.split(",")[0] if settings.CORS_ORIGINS else "http://localhost:3000"
-    callback_url = f"{callback_base}/pay/{share_token}/callback?payment_id={payment_id}"
 
     return OpenPaymentsInitiateResponse(
         payment_id=payment_id,
@@ -263,7 +261,7 @@ async def open_payments_callback(
     metadata = audit_result.data[0]["metadata"]
     continue_uri = metadata["continue_uri"]
     continue_token = metadata["continue_token"]
-    incoming_payment_id = metadata["incoming_payment_id"]
+    quote_id = metadata["quote_id"]
     sender_wallet_url = metadata["sender_wallet_url"]
 
     # Finalize the grant via OP server
@@ -271,17 +269,15 @@ async def open_payments_callback(
         import httpx
         op_url = settings.OP_SERVER_URL or "http://localhost:3100"
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(
                 f"{op_url}/finalize-payment",
                 json={
-                    "payment_id": payment_id,
                     "continue_uri": continue_uri,
                     "continue_token": continue_token,
                     "sender_wallet_url": sender_wallet_url,
-                    "incoming_payment_id": incoming_payment_id,
-                    "amount_minor": payment["amount_minor"],
-                    "description": f"Brivia bill contribution",
+                    "quote_id": quote_id,
+                    "description": "Brivia bill contribution",
                 },
             )
             resp.raise_for_status()

@@ -18,7 +18,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { BriviaMark } from "@/components/BriviaAppShell";
-import { getPublicBill, contributeToBill, initiateOpenPayments, type PublicBill, type Payment } from "@/lib/api";
+import { getPublicBill, contributeToBill, initiateOpenPayments, getOpenPaymentsCallback, type PublicBill, type Payment } from "@/lib/api";
 
 function formatMoney(minor: number): string {
   return `₦${(minor / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
@@ -45,6 +45,8 @@ export default function PublicPayment() {
   const [amount, setAmount] = useState("");
   const [walletUrl, setWalletUrl] = useState("");
   const [paymentMode, setPaymentMode] = useState<"mock" | "openpayments">("mock");
+  const [opPaymentId, setOpPaymentId] = useState("");
+  const [opPolling, setOpPolling] = useState(false);
   const [error, setError] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [payment, setPayment] = useState<Payment | null>(null);
@@ -69,6 +71,61 @@ export default function PublicPayment() {
     );
   }
 
+  if (opPolling) {
+    return (
+      <div className="public-page">
+        <header className="public-header">
+          <Link href="/" className="public-brand"><BriviaMark /></Link>
+          <div className="secure-header-note"><Loader2 className="animate-spin" size={15} /> Waiting for approval…</div>
+        </header>
+        <main className="min-h-screen flex flex-col items-center justify-center gap-4">
+          <Loader2 className="animate-spin text-[#0e5f4d]" size={40} />
+          <h2 style={{ color: "#163b30" }}>Approve the payment in the wallet tab</h2>
+          <p style={{ color: "#6d8178", maxWidth: 420, textAlign: "center", lineHeight: 1.6 }}>
+            A wallet approval page opened in a new tab. Approve the payment there, then come back here — we'll detect it automatically.
+          </p>
+          <button
+            className="outline-button"
+            onClick={() => {
+              setOpPolling(false);
+              setError("");
+            }}
+            style={{ marginTop: 8 }}
+          >
+            Cancel
+          </button>
+        </main>
+      </div>
+    );
+  }
+
+  // Poll for Open Payments completion
+  useEffect(() => {
+    if (!opPolling || !opPaymentId || !token) return;
+    let attempts = 0;
+    const maxAttempts = 60; // 2 minutes
+    let active = true;
+
+    async function poll() {
+      try {
+        const result = await getOpenPaymentsCallback(token, opPaymentId);
+        if (!active) return;
+        setPayment(result.payment);
+        setOpPolling(false);
+      } catch {
+        attempts++;
+        if (active && attempts < maxAttempts) {
+          setTimeout(poll, 2000);
+        } else if (active) {
+          setOpPolling(false);
+          setError("Payment timed out. Check your wallet and try again.");
+        }
+      }
+    }
+    poll();
+    return () => { active = false; };
+  }, [opPolling, opPaymentId, token]);
+
   if (notFound || !bill) {
     return <InvalidLink />;
   }
@@ -91,17 +148,18 @@ export default function PublicPayment() {
     setIsProcessing(true);
     try {
       if (paymentMode === "openpayments" && walletUrl.trim()) {
-        // Open Payments flow — redirect to wallet for approval
+        // Open Payments flow — open wallet approval in new tab,
+        // poll from this tab until payment settles
         const result = await initiateOpenPayments(token, {
           amount_minor: amountMinor,
           contributor_name: contributorName || "Anonymous",
           sender_wallet_url: walletUrl.trim(),
         });
-        // Store payment_id so callback page can find it
-        localStorage.setItem("brivia_op_payment_id", result.payment_id);
-        localStorage.setItem("brivia_op_share_token", token);
-        // Redirect user to wallet provider for approval
-        window.location.href = result.redirect_url;
+        // Open wallet approval in new tab
+        window.open(result.redirect_url, "_blank");
+        // Start polling for payment completion
+        setOpPaymentId(result.payment_id);
+        setOpPolling(true);
         return;
       }
 
@@ -234,11 +292,7 @@ export default function PublicPayment() {
                   : "Demo mode — simulated payment for testing."
                 }
               </p>
-              {paymentMode === "openpayments" && (
-                <p style={{ marginTop: 8, fontSize: ".75rem", color: "#81948b" }}>
-                  Already approved? <Link href={`/pay/${token}/callback`} style={{ color: "#0e5f4d", textDecoration: "underline" }}>Check payment status</Link>
-                </p>
-              )}
+
             </form>
           )}
         </section>

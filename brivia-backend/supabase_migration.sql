@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS bills (
     currency                 TEXT NOT NULL DEFAULT 'NGN',
     amount_paid_minor        BIGINT NOT NULL DEFAULT 0,
     remaining_balance_minor  BIGINT NOT NULL,
+    external_payment_id      TEXT,
     status                   TEXT NOT NULL DEFAULT 'ISSUED'
                              CHECK (status IN ('ISSUED','PARTIALLY_PAID','PAID','OVERDUE','CANCELLED')),
     due_date                 DATE NOT NULL,
