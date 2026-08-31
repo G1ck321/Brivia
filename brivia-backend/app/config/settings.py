@@ -29,7 +29,8 @@ class Settings(BaseSettings):
     IDEMPOTENCY_KEY_LENGTH: int = 32
 
     # --- Open Payments ---
-    OP_SERVER_URL: str = "http://localhost:3100"  # Node.js Open Payments server
+    # OP_SERVER_URL must be set in production (e.g. https://brivia-op-server.onrender.com)
+    OP_SERVER_URL: str = ""  # Node.js Open Payments server
     OP_PRIVATE_KEY_PATH: str = "private.key"
     OP_KEY_ID: str = ""
     OP_WALLET_ADDRESS_URL: str = ""  # Provider's wallet address

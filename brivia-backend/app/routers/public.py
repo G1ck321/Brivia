@@ -22,6 +22,7 @@ from app.services.payment_service import (
     calculate_platform_fee,
 )
 from app.config.settings import get_settings
+from app.services.open_payments_client import get_op_server_url
 
 router = APIRouter(prefix="/public", tags=["Public"])
 
@@ -113,8 +114,13 @@ async def initiate_open_payments(share_token: str, data: OpenPaymentsInitiateReq
     incoming_payment_id = bill.get("external_payment_id")
     if not incoming_payment_id:
         # Set up incoming payment via OP server (Node.js SDK handles auth correctly)
-        receiver_wallet = settings.OP_RECEIVING_WALLET_URL or "https://ilp.interledger-test.dev/practice"
-        op_url = settings.OP_SERVER_URL or "http://localhost:3100"
+        receiver_wallet = settings.OP_RECEIVING_WALLET_URL
+        if not receiver_wallet:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="OP_RECEIVING_WALLET_URL is not configured."
+            )
+        op_url = get_op_server_url()
 
         try:
             import httpx
@@ -166,7 +172,7 @@ async def initiate_open_payments(share_token: str, data: OpenPaymentsInitiateReq
     # Initiate outgoing payment grant via OP server
     try:
         import httpx
-        op_url = settings.OP_SERVER_URL or "http://localhost:3100"
+        op_url = get_op_server_url()
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(
@@ -267,7 +273,7 @@ async def open_payments_callback(
     # Finalize the grant via OP server
     try:
         import httpx
-        op_url = settings.OP_SERVER_URL or "http://localhost:3100"
+        op_url = get_op_server_url()
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(

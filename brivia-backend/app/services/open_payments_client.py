@@ -16,10 +16,18 @@ logger = logging.getLogger(__name__)
 
 
 def get_op_server_url() -> str:
-    """Get the Open Payments server URL."""
+    """Get the Open Payments server URL.
+    
+    Raises RuntimeError if not configured — prevents silent localhost fallback in production.
+    """
     settings = get_settings()
-    # Default to local Node.js server
-    return getattr(settings, "OP_SERVER_URL", "http://localhost:3100")
+    url = settings.OP_SERVER_URL.strip() if settings.OP_SERVER_URL else ""
+    if not url:
+        raise RuntimeError(
+            "OP_SERVER_URL is not configured. "
+            "Set the OP_SERVER_URL environment variable to the Node.js Open Payments server URL."
+        )
+    return url.rstrip("/")
 
 
 async def _post(path: str, data: dict) -> dict:
