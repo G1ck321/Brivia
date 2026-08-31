@@ -49,12 +49,20 @@ function getPrivateKey() {
   // Option 1: OP_PRIVATE_KEY env var (for Render / cloud deploy)
   if (process.env.OP_PRIVATE_KEY) {
     console.log("Using private key from OP_PRIVATE_KEY env var");
-    // Handle escaped newlines from Render env var paste
     let key = process.env.OP_PRIVATE_KEY;
+
+    // Handle escaped newlines from Render env var paste (\n → actual newlines)
     if (key.includes("\\n")) {
       key = key.replace(/\\n/g, "\n");
       console.log("Converted escaped newlines in private key");
     }
+
+    // Validate PEM format
+    if (!key.includes("-----BEGIN ")) {
+      console.error("Private key does not start with -----BEGIN. First 50 chars:", key.substring(0, 50));
+      throw new Error("OP_PRIVATE_KEY is not in PEM format. Must start with -----BEGIN PRIVATE KEY-----");
+    }
+    console.log("Private key looks valid (PEM format detected)");
     return key;
   }
   // Option 2: Local file (for local dev)
