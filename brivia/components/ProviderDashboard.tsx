@@ -44,8 +44,10 @@ function billProgress(bill: Bill): number {
 }
 
 function statusCopy(status: string) {
-  if (status === "PAID") return "Funded";
-  if (status === "PARTIALLY_PAID") return "In progress";
+  if (status === "PAID") return "Fully funded";
+  if (status === "PARTIALLY_PAID") return "Partially funded";
+  if (status === "OVERDUE") return "Overdue";
+  if (status === "CANCELLED") return "Cancelled";
   return "Awaiting support";
 }
 
@@ -232,7 +234,7 @@ export default function ProviderDashboard() {
         </section>
       )}
 
-      <section className="bill-list-section">
+      <section className="bill-list-section" id="bills-section">
         <div className="section-heading">
           <div><p className="eyebrow">All active bills</p><h2>Care ledger</h2></div>
           <button className="quiet-link" type="button" onClick={() => setShowCreate(true)}>New bill <FilePlus2 size={16} /></button>
@@ -250,7 +252,13 @@ export default function ProviderDashboard() {
               <span className={`tiny-status ${b.status.toLowerCase()}`}>{statusCopy(b.status)}</span>
               <span><strong>{formatMoney(b.amount_paid_minor)}</strong><small>of {formatMoney(b.amount_minor)}</small></span>
               <span>{formatDate(b.due_date)}</span>
-              <ChevronRight size={18} />
+              {b.status === "PARTIALLY_PAID" ? (
+                <Link href={`/pay/${b.public_bill_id}`} className="outline-button" style={{ padding: "6px 12px", fontSize: ".72rem", minHeight: "auto" }} onClick={(e) => e.stopPropagation()}>
+                  Pay now
+                </Link>
+              ) : (
+                <ChevronRight size={18} />
+              )}
             </button>
           ))}
           {bills.length === 0 && (

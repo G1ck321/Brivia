@@ -5,7 +5,8 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   Bell,
   ClipboardPlus,
@@ -17,6 +18,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getMe, type User } from "@/lib/api";
 
 const markUrl = "/logobriv.png";
 
@@ -24,8 +26,17 @@ const navItems = [
   { label: "Overview", href: "/", icon: LayoutDashboard },
   { label: "Create bill", href: "/provider/create", icon: ClipboardPlus },
   { label: "Patient view", href: "/patient", icon: UsersRound },
-  { label: "Bills", href: "/", icon: FileText },
+  { label: "Bills", href: "/", icon: FileText, scrollId: "bills-section" },
 ];
+
+function Tooltip({ children, text }: { children: ReactNode; text: string }) {
+  return (
+    <div className="tooltip-wrapper">
+      {children}
+      <span className="tooltip-label">{text}</span>
+    </div>
+  );
+}
 
 export function BriviaMark({ withName = true, compact = false }: { withName?: boolean; compact?: boolean }) {
   return (
@@ -41,17 +52,48 @@ export function BriviaMark({ withName = true, compact = false }: { withName?: bo
   );
 }
 
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((w) => w[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
 export function BriviaAppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    getMe().then(setUser).catch(() => {});
+  }, []);
+
+  const handleNavClick = (item: (typeof navItems)[number]) => {
+    if (item.scrollId && pathname === "/") {
+      const el = document.getElementById(item.scrollId);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+    }
+  };
+
+  const initials = user ? getInitials(user.name) : "";
+  const displayName = user?.name || "";
 
   return (
     <div className="min-h-screen bg-[#f4f6ef] text-[#163b30]">
       <header className="mobile-topbar">
         <BriviaMark />
-        <button className="icon-button" type="button" aria-label="View notifications">
-          <Bell size={19} />
-          <span className="notification-ping" />
-        </button>
+        <Tooltip text="Notifications">
+          <button className="icon-button" type="button" aria-label="View notifications">
+            <Bell size={19} />
+            <span className="notification-ping" />
+          </button>
+        </Tooltip>
       </header>
 
       <aside className="contour-rail" aria-label="Main navigation">
@@ -65,26 +107,45 @@ export function BriviaAppShell({ children }: { children: ReactNode }) {
               const Icon = item.icon;
               const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
               return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  aria-label={item.label}
-                  className={cn("rail-link", isActive && "rail-link-active")}
-                >
-                  <Icon size={20} strokeWidth={isActive ? 2.3 : 1.8} />
-                </Link>
+                <Tooltip key={item.label} text={item.label}>
+                  <Link
+                    href={item.href}
+                    aria-label={item.label}
+                    className={cn("rail-link", isActive && "rail-link-active")}
+                    onClick={() => handleNavClick(item)}
+                  >
+                    <Icon size={20} strokeWidth={isActive ? 2.3 : 1.8} />
+                  </Link>
+                </Tooltip>
               );
             })}
           </nav>
         </div>
         <div className="flex flex-col items-center gap-3">
-          <button className="rail-link" type="button" aria-label="Workspace settings">
-            <Settings size={20} />
-          </button>
-          <button className="rail-link" type="button" aria-label="Sign out of demo">
-            <LogOut size={20} />
-          </button>
-          <div className="provider-avatar" title="Dr. Temi Adebayo">TA</div>
+          <Tooltip text="Settings">
+            <Link href="/settings" className="rail-link" aria-label="Workspace settings">
+              <Settings size={20} />
+            </Link>
+          </Tooltip>
+          <Tooltip text="Sign out">
+            <button
+              className="rail-link"
+              type="button"
+              aria-label="Sign out"
+              onClick={() => {
+                localStorage.removeItem("brivia_token");
+                localStorage.removeItem("brivia_user");
+                router.push("/");
+              }}
+            >
+              <LogOut size={20} />
+            </button>
+          </Tooltip>
+          <Tooltip text={displayName}>
+            <Link href="/settings" className="provider-avatar" aria-label="Account settings">
+              {initials}
+            </Link>
+          </Tooltip>
         </div>
       </aside>
 
