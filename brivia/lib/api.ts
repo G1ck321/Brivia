@@ -285,4 +285,30 @@ export async function pollSettlement(billId: string) {
   });
 }
 
+// --- Profile ---
+
+export async function updateProfile(data: { name: string; facility_name?: string }) {
+  return apiRequest<User>("/auth/me", {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function changePassword(data: {
+  current_password: string;
+  new_password: string;
+}) {
+  return apiRequest<{ message: string }>("/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function logout() {
+  setAuthToken(null);
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("brivia_user");
+  }
+}
+
 export { setAuthToken };
