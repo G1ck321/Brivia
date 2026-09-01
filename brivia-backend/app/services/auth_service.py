@@ -89,3 +89,39 @@ async def get_user_by_id(user_id: str) -> dict | None:
     db = get_supabase()
     result = db.table("users").select("*").eq("id", user_id).limit(1).execute()
     return result.data[0] if result.data else None
+
+
+async def update_user_profile(user_id: str, name: str, facility_name: str | None = None) -> dict:
+    """Update user's name and facility name."""
+    db = get_supabase()
+    now = datetime.now(timezone.utc).isoformat()
+
+    update_data = {"name": name, "updated_at": now}
+    if facility_name is not None:
+        update_data["facility_name"] = facility_name
+
+    db.table("users").update(update_data).eq("id", user_id).execute()
+
+    updated = db.table("users").select("*").eq("id", user_id).limit(1).execute()
+    if not updated.data:
+        raise ValueError("User not found.")
+    return updated.data[0]
+
+
+async def change_user_password(user_id: str, current_password: str, new_password: str) -> None:
+    """Change user's password after verifying the current one."""
+    db = get_supabase()
+
+    result = db.table("users").select("*").eq("id", user_id).limit(1).execute()
+    if not result.data:
+        raise ValueError("User not found.")
+
+    user = result.data[0]
+    if not verify_password(current_password, user["password_hash"]):
+        raise ValueError("Current password is incorrect.")
+
+    now = datetime.now(timezone.utc).isoformat()
+    db.table("users").update({
+        "password_hash": hash_password(new_password),
+        "updated_at": now,
+    }).eq("id", user_id).execute()
