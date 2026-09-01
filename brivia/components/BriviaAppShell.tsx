@@ -18,7 +18,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getMe, type User } from "@/lib/api";
+import { getMe, logout as apiLogout, type User } from "@/lib/api";
 
 const markUrl = "/logobriv.png";
 
@@ -72,11 +72,14 @@ export function BriviaAppShell({ children }: { children: ReactNode }) {
   }, []);
 
   const handleNavClick = (item: (typeof navItems)[number]) => {
-    if (item.scrollId && pathname === "/") {
-      const el = document.getElementById(item.scrollId);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
-        return;
+    if (item.scrollId) {
+      // If already on the target page, scroll directly
+      if (pathname === item.href) {
+        const el = document.getElementById(item.scrollId);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+          return;
+        }
       }
     }
   };
@@ -133,8 +136,7 @@ export function BriviaAppShell({ children }: { children: ReactNode }) {
               type="button"
               aria-label="Sign out"
               onClick={() => {
-                localStorage.removeItem("brivia_token");
-                localStorage.removeItem("brivia_user");
+                apiLogout();
                 router.push("/");
               }}
             >
