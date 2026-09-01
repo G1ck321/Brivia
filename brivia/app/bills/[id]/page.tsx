@@ -284,7 +284,7 @@ export default function BillDetailPage() {
             </button>
 
             {shareUrl && (
-              <Link href={`/pay/${shareUrl.split("/pay/")[1] || ""}`} className="outline-button full" style={{ marginTop: 8 }}>
+              <Link href={`/pay/${shareUrl.split("/pay/")[1] || ""}`} className="outline-button full" style={{ marginTop: 8 }} target="_blank" rel="noopener noreferrer">
                 Preview pay page <ExternalLink size={14} />
               </Link>
             )}

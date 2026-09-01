@@ -99,9 +99,23 @@ export default function PatientDashboard() {
     return (
       <BriviaAppShell>
         <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <p className="text-[#6d8278]">No bills found for your account.</p>
-            <Link href="/" className="primary-button mt-4 inline-flex">Go home</Link>
+          <div style={{ maxWidth: 440, textAlign: "center" }}>
+            <div style={{ width: 56, height: 56, borderRadius: 18, background: "#e7f2dc", display: "grid", placeItems: "center", margin: "0 auto 20px" }}>
+              <HeartHandshake size={26} color="#0e5f4d" />
+            </div>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-.055em", color: "#163b30" }}>No bills yet</h2>
+            <p style={{ color: "#6d8278", fontSize: ".9rem", lineHeight: 1.6, marginTop: 10 }}>
+              Your healthcare provider creates verified bills on Brivia. Once created, they appear here so you can share them with supporters.
+            </p>
+            <div style={{ marginTop: 20, padding: 18, borderRadius: 16, background: "#f5f8f1", textAlign: "left" }}>
+              <p style={{ margin: 0, fontSize: ".78rem", fontWeight: 700, color: "#3b6655", marginBottom: 8 }}>How it works</p>
+              <ol style={{ margin: 0, paddingLeft: 18, fontSize: ".82rem", color: "#5d776c", lineHeight: 1.8 }}>
+                <li>Your doctor or facility creates a verified bill on Brivia</li>
+                <li>The bill appears in your dashboard automatically</li>
+                <li>You share the payment link with people who want to help</li>
+              </ol>
+            </div>
+            <Link href="/" className="primary-button mt-5 inline-flex">Go home</Link>
           </div>
         </div>
       </BriviaAppShell>
@@ -170,7 +184,7 @@ export default function PatientDashboard() {
                 {copied ? <><Check size={17} /> Copied</> : <><Copy size={17} /> Copy secure link</>}
               </button>
               {shareUrl && (
-                <Link className="outline-button open-link" href={`/pay/${shareUrl.split("/pay/")[1] || ""}`}>
+                <Link className="outline-button open-link" href={`/pay/${shareUrl.split("/pay/")[1] || ""}`} target="_blank" rel="noopener noreferrer">
                   Open payment page <ExternalLink size={16} />
                 </Link>
               )}

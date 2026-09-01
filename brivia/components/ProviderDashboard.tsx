@@ -199,7 +199,7 @@ export default function ProviderDashboard() {
                 <Copy size={16} /> Copy payment link
               </button>
               {shareUrl && (
-                <Link href={`/pay/${shareUrl.split("/pay/")[1] || ""}`} className="button-ghost-on-dark">
+                <Link href={`/pay/${shareUrl.split("/pay/")[1] || ""}`} className="button-ghost-on-dark" target="_blank" rel="noopener noreferrer">
                   Preview pay page <ArrowUpRight size={16} />
                 </Link>
               )}
