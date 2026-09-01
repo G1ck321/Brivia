@@ -63,10 +63,13 @@ export default function OpenPaymentsCallback() {
         // Clean up localStorage
         localStorage.removeItem("brivia_op_payment_id");
         localStorage.removeItem("brivia_op_share_token");
-      } catch {
+      } catch (err) {
         attempts++;
+        // 409 means the network is still settling — keep polling
+        const isStillProcessing = err instanceof Error && err.message.includes("409");
         if (active && attempts < maxAttempts) {
-          setTimeout(poll, 2000);
+          const delay = isStillProcessing ? 2500 : 2000;
+          setTimeout(poll, delay);
         } else if (active) {
           setStatus("error");
           setErrorMessage("Payment could not be finalized. The wallet may not have approved yet, or the network hasn't settled. Try again.");
@@ -85,10 +88,10 @@ export default function OpenPaymentsCallback() {
       <div className="public-page">
         <header className="public-header">
           <Link href="/" className="public-brand"><BriviaMark /></Link>
-          <div className="secure-header-note"><Loader2 className="animate-spin" size={15} /> Processing…</div>
+          <div className="secure-header-note"><Loader2 className="animate-spin-slow" size={15} /> Processing…</div>
         </header>
         <main className="min-h-screen flex flex-col items-center justify-center gap-4">
-          <Loader2 className="animate-spin text-[#0e5f4d]" size={40} />
+          <Loader2 className="" size={40} />
           <h2 style={{ color: "#163b30" }}>Finalizing your payment…</h2>
           <p style={{ color: "#6d8178", maxWidth: 400, textAlign: "center" }}>
             Your wallet approved the payment. We're waiting for the Interledger network to settle the funds. This usually takes 2–10 seconds.
