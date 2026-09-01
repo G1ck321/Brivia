@@ -6,6 +6,7 @@
 "use client";
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import {
   ArrowUpRight,
@@ -52,6 +53,7 @@ function statusCopy(status: string) {
 }
 
 export default function ProviderDashboard() {
+  const router = useRouter();
   const [bills, setBills] = useState<Bill[]>([]);
   const [activeBill, setActiveBill] = useState<Bill | null>(null);
   const [loading, setLoading] = useState(true);
@@ -246,7 +248,7 @@ export default function ProviderDashboard() {
               className={`bill-table-row ${b.id === bill?.id ? "selected" : ""}`}
               type="button"
               key={b.id}
-              onClick={() => setActiveBill(b)}
+              onClick={() => router.push(`/bills/${b.id}`)}
             >
               <span><strong>{b.public_bill_id}</strong><small>{b.patient_name}</small></span>
               <span className={`tiny-status ${b.status.toLowerCase()}`}>{statusCopy(b.status)}</span>
