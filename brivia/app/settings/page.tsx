@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { BriviaAppShell } from "@/components/BriviaAppShell";
-import { getMe, updateProfile, changePassword, type User as UserType } from "@/lib/api";
+import { getMe, updateProfile, changePassword, logout as apiLogout, type User as UserType } from "@/lib/api";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -389,8 +389,7 @@ export default function SettingsPage() {
           <Link
             href="/"
             onClick={() => {
-              localStorage.removeItem("brivia_token");
-              localStorage.removeItem("brivia_user");
+              apiLogout();
               toast.success("Signed out");
             }}
             style={{

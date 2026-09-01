@@ -1,5 +1,5 @@
-import LandingPage from "@/components/LandingPage";
+import AuthHome from "@/components/AuthHome";
 
 export default function Page() {
-  return <LandingPage />;
+  return <AuthHome />;
 }

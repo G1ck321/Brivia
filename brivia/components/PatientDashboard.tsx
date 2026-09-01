@@ -89,7 +89,7 @@ export default function PatientDashboard() {
     return (
       <BriviaAppShell>
         <div className="min-h-screen flex items-center justify-center">
-          <Loader2 className="animate-spin text-[#0e5f4d]" size={28} />
+          <Loader2 className="animate-spin-slow text-[#0e5f4d]" size={28} />
         </div>
       </BriviaAppShell>
     );

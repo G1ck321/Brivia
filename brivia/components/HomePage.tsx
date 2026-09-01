@@ -168,7 +168,7 @@ export default function HomePage() {
               disabled={loading}
             >
               {loading ? (
-                <><Loader2 className="animate-spin" size={17} /> {mode === "login" ? "Signing in…" : "Creating account…"}</>
+                <><Loader2 className="animate-spin-slow" size={17} /> {mode === "login" ? "Signing in…" : "Creating account…"}</>
               ) : (
                 <>{mode === "login" ? "Sign in" : "Create account"} <ArrowRight size={17} /></>
               )}

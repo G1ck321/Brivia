@@ -74,7 +74,7 @@ export default function PublicPayment() {
     return (
       <div className="public-page">
         <div className="min-h-screen flex items-center justify-center">
-          <Loader2 className="animate-spin text-[#0e5f4d]" size={32} />
+          <Loader2 className="animate-spin-slow text-[#0e5f4d]" size={32} />
         </div>
       </div>
     );
@@ -184,7 +184,7 @@ export default function PublicPayment() {
           {hasPendingPayment && (
             <div style={{ marginBottom: 20, padding: 18, borderRadius: 16, background: "#fff8e1", border: "2px solid #f9a825", display: "flex", alignItems: "flex-start", gap: 14 }}>
               <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#f9a825", display: "grid", placeItems: "center", flexShrink: 0 }}>
-                <Loader2 size={22} color="#fff" className="animate-spin" />
+                <Loader2 size={22} color="#fff" className="animate-spin-slow" />
               </div>
               <div style={{ flex: 1 }}>
                 <p style={{ margin: 0, fontWeight: 700, fontSize: ".95rem", color: "#5d4037" }}>Waiting for your confirmation</p>
@@ -193,6 +193,8 @@ export default function PublicPayment() {
                 </p>
                 <Link
                   href={`/pay/${token}/callback`}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
