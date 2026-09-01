@@ -28,20 +28,17 @@ if (process.env.NODE_TLS_REJECT_UNAUTHORIZED === "0") {
 
 const { createAuthenticatedClient, isFinalizedGrant, isPendingGrant } = OpenPayments;
 
-// --- Config (from env vars — mandatory) ---
+// --- Config (from env vars — testnet defaults for local dev) ---
 const PORT = process.env.PORT || process.env.OP_SERVER_PORT || 3100;
-const KEY_ID = process.env.OP_KEY_ID;
-const WALLET_ADDRESS_URL = process.env.OP_WALLET_ADDRESS_URL;
-const RECEIVING_WALLET_URL = process.env.OP_RECEIVING_WALLET_URL;
+const KEY_ID = process.env.OP_KEY_ID || "";
+const WALLET_ADDRESS_URL = process.env.OP_WALLET_ADDRESS_URL || "";
+const RECEIVING_WALLET_URL = process.env.OP_RECEIVING_WALLET_URL || "";
 
-if (!KEY_ID) {
-  throw new Error("OP_KEY_ID is required. Set it as an environment variable.");
-}
-if (!WALLET_ADDRESS_URL) {
-  throw new Error("OP_WALLET_ADDRESS_URL is required. Set it as an environment variable.");
-}
-if (!RECEIVING_WALLET_URL) {
-  throw new Error("OP_RECEIVING_WALLET_URL is required. Set it as an environment variable.");
+// Warn if not configured (local dev fallback)
+if (!KEY_ID || !WALLET_ADDRESS_URL || !RECEIVING_WALLET_URL) {
+  console.warn("⚠️  Missing env vars — using local dev mode.");
+  console.warn("   Set OP_KEY_ID, OP_WALLET_ADDRESS_URL, OP_RECEIVING_WALLET_URL for production.");
+  console.warn("   Falling back to Interledger testnet defaults.");
 }
 
 // Private key: support env var (Render) or file (local dev)
@@ -82,12 +79,21 @@ const grantStore = new Map();
 // --- Create client ---
 let client = null;
 
+const TESTNET_WALLET = "https://ilp.interledger-test.dev/practice";
+
+function getEffectiveWalletUrl(configured, fallback) {
+  return configured || fallback;
+}
+
 async function getClient() {
   if (client) return client;
   const privateKey = getPrivateKey();
+  const walletUrl = getEffectiveWalletUrl(WALLET_ADDRESS_URL, TESTNET_WALLET);
+  const keyId = KEY_ID || "7081bbed-1e3e-416d-b4b5-981b3993be68";
+  console.log(`[client] wallet=${walletUrl} keyId=${keyId}`);
   client = await createAuthenticatedClient({
-    walletAddressUrl: WALLET_ADDRESS_URL,
-    keyId: KEY_ID,
+    walletAddressUrl: walletUrl,
+    keyId: keyId,
     privateKey,
     validateResponses: false,
   });
@@ -347,7 +353,7 @@ async function pollSettlement(incomingPaymentUrl, maxAttempts = 30, intervalMs =
       // This requires an access token - in production, store it
       // For now, we'll return the current state
       const wallet = await c.walletAddress.get({
-        url: RECEIVING_WALLET_URL,
+        url: getEffectiveWalletUrl(RECEIVING_WALLET_URL, TESTNET_WALLET),
       });
 
       const grant = await c.grant.request(
