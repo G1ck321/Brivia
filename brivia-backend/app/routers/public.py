@@ -120,10 +120,9 @@ async def initiate_open_payments(share_token: str, data: OpenPaymentsInitiateReq
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="OP_RECEIVING_WALLET_URL is not configured."
             )
-        op_url = get_op_server_url()
-
         try:
             import httpx
+            op_url = get_op_server_url()
             async with httpx.AsyncClient(timeout=30.0) as hc:
                 resp = await hc.post(
                     f"{op_url}/setup-incoming",
@@ -173,7 +172,6 @@ async def initiate_open_payments(share_token: str, data: OpenPaymentsInitiateReq
     try:
         import httpx
         op_url = get_op_server_url()
-
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(
                 f"{op_url}/initiate-outgoing",
@@ -251,6 +249,40 @@ async def open_payments_callback(
 
     payment = payment_result.data[0]
 
+    # If already completed, return cached result immediately (idempotent)
+    if payment["status"] == PaymentStatus.COMPLETED.value:
+        updated_bill_result = db.table("bills").select("*").eq("id", bill_id).limit(1).execute()
+        bill_status = "ISSUED"
+        if updated_bill_result.data:
+            bill_status = updated_bill_result.data[0]["status"]
+        platform_fee = calculate_platform_fee(payment["amount_minor"])
+        net_amount = payment["amount_minor"] - platform_fee
+        return OpenPaymentsCallbackResponse(
+            payment=PaymentResponse(
+                id=payment["id"],
+                bill_id=payment["bill_id"],
+                contributor_name=payment["contributor_name"],
+                amount_minor=payment["amount_minor"],
+                currency=payment["currency"],
+                status=PaymentStatus.COMPLETED,
+                payment_reference=payment["payment_reference"],
+                created_at=payment["created_at"],
+            ),
+            bill_status=bill_status,
+            received_amount=payment["amount_minor"],
+            gross_amount=payment["amount_minor"],
+            platform_fee=platform_fee,
+            net_amount=net_amount,
+            message="Payment already completed",
+        )
+
+    # If payment failed on a previous attempt, let the caller know
+    if payment["status"] == PaymentStatus.FAILED.value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This payment has already failed. Please try making a new contribution.",
+        )
+
     # Get grant details from audit log
     audit_result = (
         db.table("audit_logs")
@@ -274,7 +306,6 @@ async def open_payments_callback(
     try:
         import httpx
         op_url = get_op_server_url()
-
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(
                 f"{op_url}/finalize-payment",
@@ -290,15 +321,12 @@ async def open_payments_callback(
             resp.raise_for_status()
             payment_result = resp.json()
 
-    except Exception as e:
-        db.table("payments").update({
-            "status": PaymentStatus.FAILED.value,
-            "updated_at": now,
-        }).eq("id", payment_id).execute()
-
+    except Exception:
+        # Don't mark as FAILED yet — the wallet may not have approved.
+        # Return 409 so the frontend knows to keep polling.
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to finalize payment: {str(e)}"
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Payment is still being processed by the network. Please wait.",
         )
 
     # Calculate platform fee
