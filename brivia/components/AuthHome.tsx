@@ -33,8 +33,8 @@ export default function AuthHome() {
 
   if (checking) {
     return (
-      <div className="min-h-screen bg-[#f4f6ef] flex items-center justify-center">
-        <p className="text-[#6d8278]">Loading…</p>
+      <div className="min-h-screen bg-[#fff8f5] flex items-center justify-center">
+        <p className="text-[#5b6478]">Loading…</p>
       </div>
     );
   }

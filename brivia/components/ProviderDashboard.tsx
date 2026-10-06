@@ -19,6 +19,7 @@ import {
   MoreHorizontal,
   Plus,
   ShieldCheck,
+  Sparkles,
   UsersRound,
   X,
 } from "lucide-react";
@@ -52,6 +53,13 @@ function statusCopy(status: string) {
   return "Awaiting support";
 }
 
+function defaultDueDate(): string {
+  const due = new Date();
+  due.setDate(due.getDate() + 14);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${due.getFullYear()}-${pad(due.getMonth() + 1)}-${pad(due.getDate())}`;
+}
+
 export default function ProviderDashboard() {
   const router = useRouter();
   const [bills, setBills] = useState<Bill[]>([]);
@@ -62,19 +70,22 @@ export default function ProviderDashboard() {
 
   // Create form state
   const [patientName, setPatientName] = useState("");
+  const [patientEmail, setPatientEmail] = useState("");
   const [description, setDescription] = useState("Outpatient treatment support");
   const [amount, setAmount] = useState("");
-  const [dueDate, setDueDate] = useState("2026-09-05");
+  const [dueDate, setDueDate] = useState(defaultDueDate);
 
   useEffect(() => {
     loadBills();
+    const refresh = window.setInterval(loadBills, 15000);
+    return () => window.clearInterval(refresh);
   }, []);
 
   async function loadBills() {
     try {
       const data = await getMyBills();
       setBills(data);
-      if (data.length > 0) setActiveBill(data[0]);
+      setActiveBill((current) => data.find((bill) => bill.id === current?.id) || data[0] || null);
     } catch (err) {
       toast.error("Failed to load bills");
     } finally {
@@ -115,13 +126,16 @@ export default function ProviderDashboard() {
     try {
       const created = await createBill({
         patient_name: patientName,
+        patient_email: patientEmail.trim() || undefined,
         description,
         amount_minor: amountMinor,
         due_date: dueDate,
       });
       setPatientName("");
+      setPatientEmail("");
       setDescription("Outpatient treatment support");
       setAmount("");
+      setDueDate(defaultDueDate());
       setShowCreate(false);
       await loadBills();
       setActiveBill(created);
@@ -135,7 +149,7 @@ export default function ProviderDashboard() {
     return (
       <BriviaAppShell>
         <div className="min-h-screen flex items-center justify-center">
-          <p className="text-[#6d8278]">Loading bills…</p>
+          <p className="text-[#5b6478]">Loading bills…</p>
         </div>
       </BriviaAppShell>
     );
@@ -158,6 +172,27 @@ export default function ProviderDashboard() {
           </button>
         </div>
       </div>
+
+      {bills.length === 0 && !showCreate && (
+        <section className="first-run" aria-label="Getting started">
+          <div>
+            <p className="verified-kicker"><Sparkles size={15} /> New workspace</p>
+            <h2>Create your first verified bill in under a minute.</h2>
+            <p className="first-run-lede">
+              Brivia gives every bill a unique ID and a share-ready payment link, so supporters can contribute from
+              anywhere — no app, no bank transfer chasing.
+            </p>
+            <button className="button-on-dark" type="button" onClick={() => setShowCreate(true)}>
+              <Plus size={17} /> Create a bill
+            </button>
+          </div>
+          <ol className="first-run-steps">
+            <li><strong>Create</strong><span>Enter the patient, amount, and due date — Brivia issues the Bill ID.</span></li>
+            <li><strong>Share</strong><span>Send the QR code or link to family and supporters.</span></li>
+            <li><strong>Track</strong><span>Contributions land in your care ledger below in real time.</span></li>
+          </ol>
+        </section>
+      )}
 
       {bill && (
         <section className="provider-grid" aria-label="Provider bill workspace">
@@ -224,7 +259,7 @@ export default function ProviderDashboard() {
 
           <article className="share-mini-card">
             <div className="qr-wrap">
-              <QRCodeSVG value={shareUrl || "https://brivia.app"} size={78} bgColor="#eff7f1" fgColor="#0e5f4d" level="M" includeMargin />
+              <QRCodeSVG value={shareUrl || "https://brivia.app"} size={78} bgColor="#fdf3ef" fgColor="#242f49" level="M" includeMargin />
             </div>
             <div>
               <p className="eyebrow">Share-ready</p>
@@ -283,6 +318,9 @@ export default function ProviderDashboard() {
             <form onSubmit={submitBill} className="create-bill-form">
               <label>Patient name
                 <input value={patientName} onChange={(e) => setPatientName(e.target.value)} placeholder="e.g. Chidinma Okeke" autoFocus />
+              </label>
+              <label>Patient email <span className="field-hint">(links this bill to their account)</span>
+                <input value={patientEmail} onChange={(e) => setPatientEmail(e.target.value)} type="email" placeholder="patient@example.com" />
               </label>
               <label>Payment description
                 <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Keep clinical detail minimal" />

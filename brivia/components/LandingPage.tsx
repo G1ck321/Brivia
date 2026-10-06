@@ -104,7 +104,7 @@ const pricingTiers = [
     features: [
       "No account required",
       "Pay from your wallet",
-      "Transparent 2% fee",
+      "0.3% + ₦50 transaction fee",
       "Instant settlement",
       "Payment receipt",
     ],
@@ -133,7 +133,7 @@ const testimonials = [
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-[#f4f6ef] text-[#163b30]">
+    <div className="min-h-screen bg-[#fff8f5] text-[#161b2f]">
       {/* Header */}
       <header className="public-header">
         <BriviaMark />
@@ -149,15 +149,15 @@ export default function LandingPage() {
 
       {/* Hero */}
       <section style={{ width: "min(1220px, calc(100% - 48px))", margin: "0 auto", padding: "80px 0 60px", textAlign: "center" }}>
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 999, background: "#e7f2dc", color: "#315e46", fontSize: ".76rem", fontWeight: 800, marginBottom: 28 }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 999, background: "#ffe9e0", color: "#541a2e", fontSize: ".76rem", fontWeight: 800, marginBottom: 28 }}>
           <HeartHandshake size={15} /> Healthcare payments, reimagined
         </div>
         <h1 style={{ fontSize: "clamp(2.5rem, 6vw, 4.5rem)", lineHeight: 1.02, letterSpacing: "-.08em", fontWeight: 900, maxWidth: 800, margin: "0 auto" }}>
           Care coordination
           <br />
-          <span style={{ color: "#0e5f4d" }}>without the friction.</span>
+          <span style={{ color: "#541a2e" }}>without the friction.</span>
         </h1>
-        <p style={{ maxWidth: 560, margin: "24px auto 0", color: "#6d8278", fontSize: "1.1rem", lineHeight: 1.6 }}>
+        <p style={{ maxWidth: 560, margin: "24px auto 0", color: "#5b6478", fontSize: "1.1rem", lineHeight: 1.6 }}>
           Brivia connects patients, providers, and supporters with transparent,
           verified healthcare bills. Every contribution is tracked. Every naira is accounted for.
         </p>
@@ -171,18 +171,29 @@ export default function LandingPage() {
         </div>
 
         {/* Stats bar */}
-        <div style={{ display: "flex", justifyContent: "center", gap: 60, marginTop: 64, paddingTop: 32, borderTop: "1px solid #dde8df" }}>
+        <div style={{ display: "flex", justifyContent: "center", gap: 60, marginTop: 64, paddingTop: 32, borderTop: "1px solid #efe1db" }}>
           <div>
-            <div style={{ fontSize: "2rem", fontWeight: 900, color: "#0e5f4d", letterSpacing: "-.06em" }}>₦0</div>
-            <div style={{ fontSize: ".76rem", color: "#81948b", fontWeight: 700, marginTop: 4 }}>Platform fee for providers</div>
+            <div style={{ fontSize: "2rem", fontWeight: 900, color: "#242f49", letterSpacing: "-.06em" }}>₦0</div>
+            <div style={{ fontSize: ".76rem", color: "#7b8398", fontWeight: 700, marginTop: 4 }}>Platform fee for providers</div>
           </div>
           <div>
-            <div style={{ fontSize: "2rem", fontWeight: 900, color: "#0e5f4d", letterSpacing: "-.06em" }}>2%</div>
-            <div style={{ fontSize: ".76rem", color: "#81948b", fontWeight: 700, marginTop: 4 }}>Transparent supporter fee</div>
+            <div style={{ fontSize: "2rem", fontWeight: 900, color: "#171c35", letterSpacing: "-.06em" }}>0.3%</div>
+            <div style={{ fontSize: ".76rem", color: "#7b8398", fontWeight: 700, marginTop: 4 }}>Plus ₦50 per contribution</div>
           </div>
           <div>
-            <div style={{ fontSize: "2rem", fontWeight: 900, color: "#0e5f4d", letterSpacing: "-.06em" }}>&lt;30s</div>
-            <div style={{ fontSize: ".76rem", color: "#81948b", fontWeight: 700, marginTop: 4 }}>Average payment time</div>
+            <div style={{ fontSize: "2rem", fontWeight: 900, color: "#242f49", letterSpacing: "-.06em" }}>&lt;30s</div>
+            <div style={{ fontSize: ".76rem", color: "#7b8398", fontWeight: 700, marginTop: 4 }}>Average payment time</div>
+          </div>
+        </div>
+      </section>
+
+      {/* Hero visual */}
+      <section style={{ width: "min(1220px, calc(100% - 48px))", margin: "0 auto", paddingBottom: 24 }}>
+        <div className="landing-hero-visual">
+          <img src="/handtogether.png" alt="People coming together to support a hospital bill" />
+          <div className="landing-hero-caption">
+            <span className="landing-hero-caption-tag">Care Connected. Payment Simplified.</span>
+            <p>Patients, families, and supporters around one verified bill — every contribution visible as it lands.</p>
           </div>
         </div>
       </section>
@@ -198,9 +209,9 @@ export default function LandingPage() {
         <div className="landing-steps-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 24 }}>
           {steps.map((step) => (
             <div key={step.num} style={{ padding: 28, borderRadius: 22, background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
-              <div style={{ fontSize: "2rem", fontWeight: 900, color: "#c7dfc7", letterSpacing: "-.06em" }}>{step.num}</div>
+              <div style={{ fontSize: "2rem", fontWeight: 900, color: "#ffc9b8", letterSpacing: "-.06em" }}>{step.num}</div>
               <h3 style={{ fontSize: "1.05rem", fontWeight: 800, letterSpacing: "-.04em", marginTop: 12 }}>{step.title}</h3>
-              <p style={{ fontSize: ".84rem", color: "#6d8278", lineHeight: 1.55, marginTop: 8 }}>{step.description}</p>
+              <p style={{ fontSize: ".84rem", color: "#5b6478", lineHeight: 1.55, marginTop: 8 }}>{step.description}</p>
             </div>
           ))}
         </div>
@@ -213,58 +224,58 @@ export default function LandingPage() {
           <h2 style={{ fontSize: "clamp(1.8rem, 3vw, 2.6rem)", letterSpacing: "-.065em", fontWeight: 900, marginTop: 8 }}>
             Built for trust.
           </h2>
-          <p style={{ maxWidth: 480, margin: "12px auto 0", color: "#6d8278", fontSize: ".92rem", lineHeight: 1.55 }}>
+          <p style={{ maxWidth: 480, margin: "12px auto 0", color: "#5b6478", fontSize: ".92rem", lineHeight: 1.55 }}>
             Every feature is designed to make healthcare payments transparent, fast, and secure.
           </p>
         </div>
         <div className="landing-features-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
           {features.map((f) => (
             <div key={f.title} style={{ padding: 26, borderRadius: 22, background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.04)", transition: "transform 160ms ease, box-shadow 160ms ease" }}
-              onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(14,95,77,.1)"; }}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(36,47,73,0.1)"; }}
               onMouseLeave={(e) => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,.04)"; }}
             >
-              <div style={{ width: 42, height: 42, borderRadius: 14, background: "#e7f2dc", display: "grid", placeItems: "center", marginBottom: 16 }}>
-                <f.icon size={20} color="#0e5f4d" />
+              <div style={{ width: 42, height: 42, borderRadius: 14, background: "#ffe9e0", display: "grid", placeItems: "center", marginBottom: 16 }}>
+                <f.icon size={20} color="#242f49" />
               </div>
               <h3 style={{ fontSize: "1rem", fontWeight: 800, letterSpacing: "-.04em" }}>{f.title}</h3>
-              <p style={{ fontSize: ".82rem", color: "#6d8278", lineHeight: 1.55, marginTop: 8 }}>{f.description}</p>
+              <p style={{ fontSize: ".82rem", color: "#5b6478", lineHeight: 1.55, marginTop: 8 }}>{f.description}</p>
             </div>
           ))}
         </div>
       </section>
 
       {/* Pricing */}
-      <section style={{ background: "#0a3e33", padding: "80px 0" }}>
+      <section style={{ background: "#161b2f", padding: "80px 0" }}>
         <div style={{ width: "min(1220px, calc(100% - 48px))", margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 48 }}>
-            <p className="eyebrow" style={{ color: "#8ece6a" }}>Pricing</p>
+            <p className="eyebrow" style={{ color: "#ffa586" }}>Pricing</p>
             <h2 style={{ fontSize: "clamp(1.8rem, 3vw, 2.6rem)", letterSpacing: "-.065em", fontWeight: 900, color: "#fff", marginTop: 8 }}>
               Simple, transparent pricing.
             </h2>
-            <p style={{ maxWidth: 480, margin: "12px auto 0", color: "#8fbfa9", fontSize: ".92rem", lineHeight: 1.55 }}>
+            <p style={{ maxWidth: 480, margin: "12px auto 0", color: "#a9b3c9", fontSize: ".92rem", lineHeight: 1.55 }}>
               No hidden fees. No monthly subscriptions. You only pay when supporters contribute.
             </p>
           </div>
           <div className="landing-pricing-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 24, maxWidth: 700, margin: "0 auto" }}>
             {pricingTiers.map((tier) => (
               <div key={tier.name} style={{
-                padding: 32, borderRadius: 24, border: tier.highlighted ? "2px solid #8ece6a" : "1px solid rgba(255,255,255,.12)",
-                background: tier.highlighted ? "rgba(142,206,106,.08)" : "rgba(255,255,255,.04)",
+                padding: 32, borderRadius: 24, border: tier.highlighted ? "2px solid #ffa586" : "1px solid rgba(255,255,255,.12)",
+                background: tier.highlighted ? "rgba(255,165,134,0.08)" : "rgba(255,255,255,.04)",
               }}>
                 <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "#fff" }}>{tier.name}</h3>
-                <div style={{ fontSize: "2.2rem", fontWeight: 900, color: "#e4f19a", letterSpacing: "-.06em", marginTop: 8 }}>{tier.price}</div>
-                <p style={{ fontSize: ".82rem", color: "#8fbfa9", marginTop: 8, marginBottom: 20 }}>{tier.description}</p>
+                <div style={{ fontSize: "2.2rem", fontWeight: 900, color: "#ffa586", letterSpacing: "-.06em", marginTop: 8 }}>{tier.price}</div>
+                <p style={{ fontSize: ".82rem", color: "#a9b3c9", marginTop: 8, marginBottom: 20 }}>{tier.description}</p>
                 <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 10 }}>
                   {tier.features.map((f) => (
-                    <li key={f} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: ".82rem", color: "#c7e4d5" }}>
-                      <Check size={16} color="#8ece6a" /> {f}
+                    <li key={f} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: ".82rem", color: "#c9d1e3" }}>
+                      <Check size={16} color="#ffa586" /> {f}
                     </li>
                   ))}
                 </ul>
                 <Link href="/auth" className={tier.highlighted ? "primary-button" : "outline-button"}
                   style={{
                     display: "inline-flex", marginTop: 24, width: "100%", justifyContent: "center",
-                    ...(tier.highlighted ? { background: "#e4f19a", color: "#0a3e33", borderColor: "#e4f19a" } : { color: "#c7e4d5", borderColor: "rgba(255,255,255,.2)" }),
+                    ...(tier.highlighted ? { background: "#ffa586", color: "#161b2f", borderColor: "#ffa586" } : { color: "#c9d1e3", borderColor: "rgba(255,255,255,.2)" }),
                   }}>
                   {tier.cta} <ArrowRight size={16} />
                 </Link>
@@ -285,14 +296,14 @@ export default function LandingPage() {
         <div className="landing-testimonials-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
           {testimonials.map((t) => (
             <div key={t.name} style={{ padding: 26, borderRadius: 22, background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
-              <p style={{ fontSize: ".88rem", color: "#3b6655", lineHeight: 1.6, fontStyle: "italic", marginBottom: 20 }}>&ldquo;{t.quote}&rdquo;</p>
+              <p style={{ fontSize: ".88rem", color: "#384358", lineHeight: 1.6, fontStyle: "italic", marginBottom: 20 }}>&ldquo;{t.quote}&rdquo;</p>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ width: 38, height: 38, borderRadius: 12, background: "#e7f2dc", display: "grid", placeItems: "center", fontSize: ".72rem", fontWeight: 800, color: "#0e5f4d" }}>
+                <div style={{ width: 38, height: 38, borderRadius: 12, background: "#ffe9e0", display: "grid", placeItems: "center", fontSize: ".72rem", fontWeight: 800, color: "#242f49" }}>
                   {t.name.split(" ").map((w) => w[0]).join("")}
                 </div>
                 <div>
                   <div style={{ fontSize: ".82rem", fontWeight: 800 }}>{t.name}</div>
-                  <div style={{ fontSize: ".72rem", color: "#81948b" }}>{t.role}</div>
+                  <div style={{ fontSize: ".72rem", color: "#7b8398" }}>{t.role}</div>
                 </div>
               </div>
             </div>
@@ -303,18 +314,18 @@ export default function LandingPage() {
       {/* CTA */}
       <section style={{ width: "min(1220px, calc(100% - 48px))", margin: "0 auto", padding: "40px 0 100px" }}>
         <div style={{
-          padding: "48px 40px", borderRadius: 28, background: "#0e5f4d", textAlign: "center",
-          boxShadow: "0 18px 40px rgba(14,95,77,.18)",
+          padding: "48px 40px", borderRadius: 28, background: "#242f49", textAlign: "center",
+          boxShadow: "0 18px 40px rgba(36,47,73,0.18)",
         }}>
           <h2 style={{ fontSize: "clamp(1.6rem, 3vw, 2.4rem)", letterSpacing: "-.065em", fontWeight: 900, color: "#fff" }}>
             Start coordinating care today.
           </h2>
-          <p style={{ maxWidth: 440, margin: "12px auto 0", color: "#b9ddca", fontSize: ".92rem", lineHeight: 1.55 }}>
+          <p style={{ maxWidth: 440, margin: "12px auto 0", color: "#c9d1e3", fontSize: ".92rem", lineHeight: 1.55 }}>
             Create your first verified bill in under a minute. No credit card required.
           </p>
           <Link href="/auth" className="primary-button" style={{
             display: "inline-flex", marginTop: 28, padding: "0 28px", minHeight: "52px", fontSize: ".9rem",
-            background: "#e4f19a", color: "#0a3e33", borderColor: "#e4f19a",
+            background: "#ffa586", color: "#161b2f", borderColor: "#ffa586",
           }}>
             Get started free <ArrowRight size={18} />
           </Link>
@@ -322,10 +333,10 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer style={{ borderTop: "1px solid #dde8df", padding: "28px 0" }}>
+      <footer style={{ borderTop: "1px solid #efe1db", padding: "28px 0" }}>
         <div style={{ width: "min(1220px, calc(100% - 48px))", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <BriviaMark withName={false} compact />
-          <p style={{ fontSize: ".74rem", color: "#81948b" }}>
+          <p style={{ fontSize: ".74rem", color: "#7b8398" }}>
             &copy; {new Date().getFullYear()} Brivia. Powered by Open Payments / Interledger.
           </p>
         </div>

@@ -60,7 +60,7 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f4f6ef] text-[#163b30]">
+    <div className="min-h-screen bg-[#fff8f5] text-[#161b2f]">
       <header className="public-header">
         <BriviaMark />
       </header>
@@ -70,9 +70,9 @@ export default function HomePage() {
           <h1 className="text-4xl font-extrabold tracking-tight leading-tight">
             Healthcare payments,
             <br />
-            <span className="text-[#0e5f4d]">coordinated.</span>
+            <span className="text-[#242f49]">coordinated.</span>
           </h1>
-          <p className="mt-4 max-w-md text-[#6d8278] leading-relaxed">
+          <p className="mt-4 max-w-md text-[#5b6478] leading-relaxed">
             Brivia helps patients, providers, and supporters coordinate
             healthcare costs transparently. Every contribution is recorded
             against a verified bill.
@@ -116,7 +116,7 @@ export default function HomePage() {
                   <select
                     value={role}
                     onChange={(e) => setRole(e.target.value as "provider" | "patient")}
-                    className="w-full min-h-[46px] mt-1 px-3 border border-[#d8e4da] rounded-[13px] bg-[#fcfdfb]"
+                    className="w-full min-h-[46px] mt-1 px-3 border border-[#d9dce5] rounded-[13px] bg-[#fffaf8]"
                   >
                     <option value="provider">Healthcare Provider</option>
                     <option value="patient">Patient</option>
@@ -174,16 +174,16 @@ export default function HomePage() {
               )}
             </button>
 
-            <p className="text-center text-sm text-[#6d8278]">
+            <p className="text-center text-sm text-[#5b6478]">
               {mode === "login" ? (
                 <>Don&apos;t have an account?{" "}
-                  <button type="button" className="text-[#0e5f4d] font-bold" onClick={() => setMode("register")}>
+                  <button type="button" className="text-[#242f49] font-bold" onClick={() => setMode("register")}>
                     Register
                   </button>
                 </>
               ) : (
                 <>Already have an account?{" "}
-                  <button type="button" className="text-[#0e5f4d] font-bold" onClick={() => setMode("login")}>
+                  <button type="button" className="text-[#242f49] font-bold" onClick={() => setMode("login")}>
                     Sign in
                   </button>
                 </>

@@ -46,13 +46,15 @@ export default function PatientDashboard() {
 
   useEffect(() => {
     loadBills();
+    const refresh = window.setInterval(loadBills, 15000);
+    return () => window.clearInterval(refresh);
   }, []);
 
   async function loadBills() {
     try {
       const data = await getMyBills();
       setBills(data);
-      if (data.length > 0) setActiveBill(data[0]);
+      setActiveBill((current) => data.find((bill) => bill.id === current?.id) || data[0] || null);
     } catch {
       toast.error("Failed to load your bills");
     } finally {
@@ -89,7 +91,7 @@ export default function PatientDashboard() {
     return (
       <BriviaAppShell>
         <div className="min-h-screen flex items-center justify-center">
-          <Loader2 className="animate-spin-slow text-[#0e5f4d]" size={28} />
+          <Loader2 className="animate-spin-slow text-[#242f49]" size={28} />
         </div>
       </BriviaAppShell>
     );
@@ -100,22 +102,34 @@ export default function PatientDashboard() {
       <BriviaAppShell>
         <div className="min-h-screen flex items-center justify-center">
           <div style={{ maxWidth: 440, textAlign: "center" }}>
-            <div style={{ width: 56, height: 56, borderRadius: 18, background: "#e7f2dc", display: "grid", placeItems: "center", margin: "0 auto 20px" }}>
-              <HeartHandshake size={26} color="#0e5f4d" />
+            <div style={{ width: 56, height: 56, borderRadius: 18, background: "#ffe9e0", display: "grid", placeItems: "center", margin: "0 auto 20px" }}>
+              <HeartHandshake size={26} color="#242f49" />
             </div>
-            <h2 style={{ fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-.055em", color: "#163b30" }}>No bills yet</h2>
-            <p style={{ color: "#6d8278", fontSize: ".9rem", lineHeight: 1.6, marginTop: 10 }}>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-.055em", color: "#161b2f" }}>No bills yet</h2>
+            <p style={{ color: "#5b6478", fontSize: ".9rem", lineHeight: 1.6, marginTop: 10 }}>
               Your healthcare provider creates verified bills on Brivia. Once created, they appear here so you can share them with supporters.
             </p>
-            <div style={{ marginTop: 20, padding: 18, borderRadius: 16, background: "#f5f8f1", textAlign: "left" }}>
-              <p style={{ margin: 0, fontSize: ".78rem", fontWeight: 700, color: "#3b6655", marginBottom: 8 }}>How it works</p>
-              <ol style={{ margin: 0, paddingLeft: 18, fontSize: ".82rem", color: "#5d776c", lineHeight: 1.8 }}>
+            <div style={{ marginTop: 20, padding: 18, borderRadius: 16, background: "#fdf3ef", textAlign: "left" }}>
+              <p style={{ margin: 0, fontSize: ".78rem", fontWeight: 700, color: "#541a2e", marginBottom: 8 }}>How it works</p>
+              <ol style={{ margin: 0, paddingLeft: 18, fontSize: ".82rem", color: "#5b6478", lineHeight: 1.8 }}>
                 <li>Your doctor or facility creates a verified bill on Brivia</li>
                 <li>The bill appears in your dashboard automatically</li>
                 <li>You share the payment link with people who want to help</li>
               </ol>
             </div>
-            <Link href="/" className="primary-button mt-5 inline-flex">Go home</Link>
+            <button
+              className="primary-button mt-5 inline-flex"
+              type="button"
+              onClick={() => {
+                setLoading(true);
+                loadBills();
+              }}
+            >
+              Check for new bills
+            </button>
+            <p style={{ margin: "12px 0 0", fontSize: ".74rem", color: "#7b8398" }}>
+              New bills show up here on their own — this just checks now.
+            </p>
           </div>
         </div>
       </BriviaAppShell>
@@ -135,7 +149,7 @@ export default function PatientDashboard() {
         </div>
       </div>
 
-      <section className="patient-grid">
+      <section className="patient-grid" id="bills-section">
         <article className="patient-bill-card">
           <div className="patient-card-top">
             <div>
@@ -175,7 +189,7 @@ export default function PatientDashboard() {
           </div>
           <div className="share-card-body">
             <div className="patient-qr">
-              <QRCodeSVG value={shareUrl || "https://brivia.app"} size={154} bgColor="#ffffff" fgColor="#0e5f4d" level="Q" includeMargin />
+              <QRCodeSVG value={shareUrl || "https://brivia.app"} size={154} bgColor="#ffffff" fgColor="#242f49" level="Q" includeMargin />
             </div>
             <div className="share-link-block">
               <label>Secure contribution link</label>
