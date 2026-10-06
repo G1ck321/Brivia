@@ -143,6 +143,7 @@ export async function getMe() {
 
 export async function createBill(data: {
   patient_name: string;
+  patient_email?: string;
   description: string;
   amount_minor: number;
   currency?: string;

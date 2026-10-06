@@ -106,7 +106,7 @@ export default function SettingsPage() {
     return (
       <BriviaAppShell>
         <div className="min-h-screen flex items-center justify-center">
-          <p className="text-[#6d8278]">Loading settings…</p>
+          <p className="text-[#5b6478]">Loading settings…</p>
         </div>
       </BriviaAppShell>
     );
@@ -138,23 +138,23 @@ export default function SettingsPage() {
                 width: 40,
                 height: 40,
                 borderRadius: 12,
-                background: "#dcf0e4",
+                background: "#ffe4d8",
                 display: "grid",
                 placeItems: "center",
               }}
             >
-              <User size={18} color="#0e5f4d" />
+              <User size={18} color="#242f49" />
             </div>
             <div>
               <h2 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700 }}>Profile</h2>
-              <p style={{ margin: 0, fontSize: ".78rem", color: "#81948b" }}>
+              <p style={{ margin: 0, fontSize: ".78rem", color: "#7b8398" }}>
                 Update your name and facility
               </p>
             </div>
           </div>
 
           <form onSubmit={handleProfileSave} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <label style={{ fontSize: ".82rem", fontWeight: 600, color: "#4a6b5e" }}>
+            <label style={{ fontSize: ".82rem", fontWeight: 600, color: "#384358" }}>
               Full name
               <input
                 value={name}
@@ -165,17 +165,17 @@ export default function SettingsPage() {
                   width: "100%",
                   marginTop: 6,
                   padding: "12px 14px",
-                  border: "1px solid #d8e4da",
+                  border: "1px solid #d9dce5",
                   borderRadius: 13,
-                  background: "#fcfdfb",
+                  background: "#fffaf8",
                   fontSize: ".9rem",
-                  color: "#163b30",
+                  color: "#161b2f",
                 }}
               />
             </label>
 
             {user?.role === "provider" && (
-              <label style={{ fontSize: ".82rem", fontWeight: 600, color: "#4a6b5e" }}>
+              <label style={{ fontSize: ".82rem", fontWeight: 600, color: "#384358" }}>
                 Facility name
                 <input
                   value={facilityName}
@@ -186,17 +186,17 @@ export default function SettingsPage() {
                     width: "100%",
                     marginTop: 6,
                     padding: "12px 14px",
-                    border: "1px solid #d8e4da",
+                    border: "1px solid #d9dce5",
                     borderRadius: 13,
-                    background: "#fcfdfb",
+                    background: "#fffaf8",
                     fontSize: ".9rem",
-                    color: "#163b30",
+                    color: "#161b2f",
                   }}
                 />
               </label>
             )}
 
-            <label style={{ fontSize: ".82rem", fontWeight: 600, color: "#4a6b5e" }}>
+            <label style={{ fontSize: ".82rem", fontWeight: 600, color: "#384358" }}>
               Email
               <input
                 value={user?.email || ""}
@@ -206,17 +206,17 @@ export default function SettingsPage() {
                   width: "100%",
                   marginTop: 6,
                   padding: "12px 14px",
-                  border: "1px solid #d8e4da",
+                  border: "1px solid #d9dce5",
                   borderRadius: 13,
-                  background: "#f0f2ed",
+                  background: "#f5f0ec",
                   fontSize: ".9rem",
-                  color: "#81948b",
+                  color: "#7b8398",
                   cursor: "not-allowed",
                 }}
               />
             </label>
 
-            <label style={{ fontSize: ".82rem", fontWeight: 600, color: "#4a6b5e" }}>
+            <label style={{ fontSize: ".82rem", fontWeight: 600, color: "#384358" }}>
               Role
               <input
                 value={user?.role === "provider" ? "Healthcare Provider" : "Patient"}
@@ -226,11 +226,11 @@ export default function SettingsPage() {
                   width: "100%",
                   marginTop: 6,
                   padding: "12px 14px",
-                  border: "1px solid #d8e4da",
+                  border: "1px solid #d9dce5",
                   borderRadius: 13,
-                  background: "#f0f2ed",
+                  background: "#f5f0ec",
                   fontSize: ".9rem",
-                  color: "#81948b",
+                  color: "#7b8398",
                   cursor: "not-allowed",
                 }}
               />
@@ -263,23 +263,23 @@ export default function SettingsPage() {
                 width: 40,
                 height: 40,
                 borderRadius: 12,
-                background: "#fff8e1",
+                background: "#fff1ea",
                 display: "grid",
                 placeItems: "center",
               }}
             >
-              <LockKeyhole size={18} color="#e6a817" />
+              <LockKeyhole size={18} color="#ffa586" />
             </div>
             <div>
               <h2 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700 }}>Password</h2>
-              <p style={{ margin: 0, fontSize: ".78rem", color: "#81948b" }}>
+              <p style={{ margin: 0, fontSize: ".78rem", color: "#7b8398" }}>
                 Change your account password
               </p>
             </div>
           </div>
 
           <form onSubmit={handlePasswordChange} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <label style={{ fontSize: ".82rem", fontWeight: 600, color: "#4a6b5e" }}>
+            <label style={{ fontSize: ".82rem", fontWeight: 600, color: "#384358" }}>
               Current password
               <input
                 type="password"
@@ -291,16 +291,16 @@ export default function SettingsPage() {
                   width: "100%",
                   marginTop: 6,
                   padding: "12px 14px",
-                  border: "1px solid #d8e4da",
+                  border: "1px solid #d9dce5",
                   borderRadius: 13,
-                  background: "#fcfdfb",
+                  background: "#fffaf8",
                   fontSize: ".9rem",
-                  color: "#163b30",
+                  color: "#161b2f",
                 }}
               />
             </label>
 
-            <label style={{ fontSize: ".82rem", fontWeight: 600, color: "#4a6b5e" }}>
+            <label style={{ fontSize: ".82rem", fontWeight: 600, color: "#384358" }}>
               New password
               <input
                 type="password"
@@ -313,16 +313,16 @@ export default function SettingsPage() {
                   width: "100%",
                   marginTop: 6,
                   padding: "12px 14px",
-                  border: "1px solid #d8e4da",
+                  border: "1px solid #d9dce5",
                   borderRadius: 13,
-                  background: "#fcfdfb",
+                  background: "#fffaf8",
                   fontSize: ".9rem",
-                  color: "#163b30",
+                  color: "#161b2f",
                 }}
               />
             </label>
 
-            <label style={{ fontSize: ".82rem", fontWeight: 600, color: "#4a6b5e" }}>
+            <label style={{ fontSize: ".82rem", fontWeight: 600, color: "#384358" }}>
               Confirm new password
               <input
                 type="password"
@@ -335,11 +335,11 @@ export default function SettingsPage() {
                   width: "100%",
                   marginTop: 6,
                   padding: "12px 14px",
-                  border: "1px solid #d8e4da",
+                  border: "1px solid #d9dce5",
                   borderRadius: 13,
-                  background: "#fcfdfb",
+                  background: "#fffaf8",
                   fontSize: ".9rem",
-                  color: "#163b30",
+                  color: "#161b2f",
                 }}
               />
             </label>
@@ -348,7 +348,7 @@ export default function SettingsPage() {
               className="primary-button"
               type="submit"
               disabled={savingPassword}
-              style={{ alignSelf: "flex-start", marginTop: 4, background: "#e6a817", color: "#3d2e00" }}
+              style={{ alignSelf: "flex-start", marginTop: 4, background: "#ffa586", color: "#541a2e" }}
             >
               <LockKeyhole size={16} />
               {savingPassword ? "Changing…" : "Change password"}
@@ -363,7 +363,7 @@ export default function SettingsPage() {
             borderRadius: 20,
             padding: 28,
             boxShadow: "0 1px 3px rgba(0,0,0,.04)",
-            border: "1px solid #f0d0d0",
+            border: "1px solid #f6dde1",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
@@ -372,16 +372,16 @@ export default function SettingsPage() {
                 width: 40,
                 height: 40,
                 borderRadius: 12,
-                background: "#fde8e8",
+                background: "#fbe7ea",
                 display: "grid",
                 placeItems: "center",
               }}
             >
-              <ShieldCheck size={18} color="#c62828" />
+              <ShieldCheck size={18} color="#b51a2b" />
             </div>
             <div>
               <h2 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700 }}>Session</h2>
-              <p style={{ margin: 0, fontSize: ".78rem", color: "#81948b" }}>
+              <p style={{ margin: 0, fontSize: ".78rem", color: "#7b8398" }}>
                 Sign out of your account
               </p>
             </div>
@@ -398,9 +398,9 @@ export default function SettingsPage() {
               gap: 8,
               padding: "10px 20px",
               borderRadius: 12,
-              border: "1px solid #f0d0d0",
+              border: "1px solid #f6dde1",
               background: "#fff",
-              color: "#c62828",
+              color: "#b51a2b",
               fontWeight: 600,
               fontSize: ".85rem",
               textDecoration: "none",

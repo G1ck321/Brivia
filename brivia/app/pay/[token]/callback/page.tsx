@@ -92,8 +92,8 @@ export default function OpenPaymentsCallback() {
         </header>
         <main className="min-h-screen flex flex-col items-center justify-center gap-4">
           <Loader2 className="" size={40} />
-          <h2 style={{ color: "#163b30" }}>Finalizing your payment…</h2>
-          <p style={{ color: "#6d8178", maxWidth: 400, textAlign: "center" }}>
+          <h2 style={{ color: "#161b2f" }}>Finalizing your payment…</h2>
+          <p style={{ color: "#5b6478", maxWidth: 400, textAlign: "center" }}>
             Your wallet approved the payment. We're waiting for the Interledger network to settle the funds. This usually takes 2–10 seconds.
           </p>
         </main>
@@ -110,8 +110,8 @@ export default function OpenPaymentsCallback() {
         </header>
         <main className="min-h-screen flex flex-col items-center justify-center gap-4">
           <div className="receipt-success-mark muted"><XCircle size={29} /></div>
-          <h2 style={{ color: "#163b30" }}>Payment could not be confirmed</h2>
-          <p style={{ color: "#6d8178", maxWidth: 400, textAlign: "center" }}>{errorMessage}</p>
+          <h2 style={{ color: "#161b2f" }}>Payment could not be confirmed</h2>
+          <p style={{ color: "#5b6478", maxWidth: 400, textAlign: "center" }}>{errorMessage}</p>
           <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
             <Link href={`/pay/${token}`} className="primary-button">Try again</Link>
             <Link href="/" className="outline-button">Back to Brivia</Link>
@@ -130,8 +130,8 @@ export default function OpenPaymentsCallback() {
       </header>
       <main className="receipt-layout">
         <section className="receipt-card">
-          <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#dcf0e4", display: "grid", placeItems: "center", marginBottom: 16 }}>
-            <Check size={36} color="#0e5f4d" strokeWidth={3} />
+          <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#ffe4d8", display: "grid", placeItems: "center", marginBottom: 16 }}>
+            <Check size={36} color="#242f49" strokeWidth={3} />
           </div>
           <p className="eyebrow">Payment successful</p>
           <h1 style={{ fontSize: "1.6rem", marginBottom: 8 }}>Thank you, {payment!.contributor_name}!</h1>
@@ -140,46 +140,46 @@ export default function OpenPaymentsCallback() {
           </p>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 24, marginBottom: 20 }}>
-            <div style={{ padding: 16, borderRadius: 16, background: "#0e5f4d", color: "white" }}>
-              <p style={{ margin: 0, fontSize: ".68rem", color: "#c7e4d5", textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 800 }}>You contributed</p>
+            <div style={{ padding: 16, borderRadius: 16, background: "#242f49", color: "white" }}>
+              <p style={{ margin: 0, fontSize: ".68rem", color: "#c9d1e3", textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 800 }}>You contributed</p>
               <strong style={{ fontSize: "1.4rem", marginTop: 4, display: "block" }}>{formatMoney(payment!.amount_minor)}</strong>
             </div>
-            <div style={{ padding: 16, borderRadius: 16, background: "#f5f8f1" }}>
-              <p style={{ margin: 0, fontSize: ".68rem", color: "#72877c", textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 800 }}>Applied to bill</p>
-              <strong style={{ fontSize: "1.4rem", marginTop: 4, display: "block", color: "#0e5f4d" }}>{formatMoney(netAmount)}</strong>
+            <div style={{ padding: 16, borderRadius: 16, background: "#fdf3ef" }}>
+              <p style={{ margin: 0, fontSize: ".68rem", color: "#5b6478", textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 800 }}>Applied to bill</p>
+              <strong style={{ fontSize: "1.4rem", marginTop: 4, display: "block", color: "#242f49" }}>{formatMoney(netAmount)}</strong>
             </div>
           </div>
 
-          <div style={{ padding: 16, borderRadius: 16, background: "#f5f8f1" }}>
-            <p style={{ margin: 0, fontSize: ".72rem", fontWeight: 800, color: "#72877c", textTransform: "uppercase", letterSpacing: ".08em" }}>How it was split</p>
+          <div style={{ padding: 16, borderRadius: 16, background: "#fdf3ef" }}>
+            <p style={{ margin: 0, fontSize: ".72rem", fontWeight: 800, color: "#5b6478", textTransform: "uppercase", letterSpacing: ".08em" }}>How it was split</p>
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, fontSize: ".85rem" }}>
-              <span style={{ color: "#6d8178" }}>ILP network fee</span>
-              <strong style={{ color: "#99733e" }}>{formatMoney(grossAmount - receivedAmount)}</strong>
+              <span style={{ color: "#5b6478" }}>ILP network fee</span>
+              <strong style={{ color: "#541a2e" }}>{formatMoney(grossAmount - receivedAmount)}</strong>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: ".85rem" }}>
-              <span style={{ color: "#6d8178" }}>Brivia platform (2%)</span>
-              <strong style={{ color: "#99733e" }}>{formatMoney(platformFee)}</strong>
+              <span style={{ color: "#5b6478" }}>Brivia platform (0.3% + ₦50)</span>
+              <strong style={{ color: "#541a2e" }}>{formatMoney(platformFee)}</strong>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: ".85rem" }}>
-              <span style={{ color: "#6d8178" }}>Net to patient bill</span>
-              <strong style={{ color: "#0e5f4d" }}>{formatMoney(netAmount)}</strong>
+              <span style={{ color: "#5b6478" }}>Net to patient bill</span>
+              <strong style={{ color: "#242f49" }}>{formatMoney(netAmount)}</strong>
             </div>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 20 }}>
             <div style={{ fontSize: ".78rem" }}>
-              <span style={{ color: "#81948b" }}>Reference</span><br/>
+              <span style={{ color: "#7b8398" }}>Reference</span><br/>
               <strong style={{ fontSize: ".75rem", wordBreak: "break-all" }}>{payment!.payment_reference}</strong>
             </div>
             <div style={{ fontSize: ".78rem" }}>
-              <span style={{ color: "#81948b" }}>Confirmed</span><br/>
+              <span style={{ color: "#7b8398" }}>Confirmed</span><br/>
               <strong style={{ fontSize: ".75rem" }}>{new Date(payment!.created_at).toLocaleString()}</strong>
             </div>
           </div>
 
-          <div style={{ marginTop: 24, padding: 14, borderRadius: 14, background: "#dcf0e4", display: "flex", alignItems: "center", gap: 10 }}>
-            <HeartHandshake size={18} color="#0e5f4d" />
-            <span style={{ fontSize: ".82rem", color: "#163b30" }}>This care bill is now <strong>{billStatus === "PAID" ? "fully funded" : `partially funded (${billStatus})`}</strong></span>
+          <div style={{ marginTop: 24, padding: 14, borderRadius: 14, background: "#ffe4d8", display: "flex", alignItems: "center", gap: 10 }}>
+            <HeartHandshake size={18} color="#242f49" />
+            <span style={{ fontSize: ".82rem", color: "#161b2f" }}>This care bill is now <strong>{billStatus === "PAID" ? "fully funded" : `partially funded (${billStatus})`}</strong></span>
           </div>
 
           <div className="receipt-actions" style={{ marginTop: 24 }}>

@@ -111,7 +111,7 @@ export default function BillDetailPage() {
     return (
       <BriviaAppShell>
         <div className="min-h-screen flex items-center justify-center">
-          <Loader2 className="animate-spin-slow text-[#0e5f4d]" size={28} />
+          <Loader2 className="animate-spin-slow text-[#242f49]" size={28} />
         </div>
       </BriviaAppShell>
     );
@@ -122,7 +122,7 @@ export default function BillDetailPage() {
       <BriviaAppShell>
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
-            <p className="text-[#6d8278]">Bill not found.</p>
+            <p className="text-[#5b6478]">Bill not found.</p>
             <Link href="/" className="primary-button mt-4 inline-flex">Go home</Link>
           </div>
         </div>
@@ -159,16 +159,16 @@ export default function BillDetailPage() {
           {/* Summary cards */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
             <div style={{ padding: 22, borderRadius: 18, background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
-              <p style={{ fontSize: ".7rem", color: "#81948b", fontWeight: 800, textTransform: "uppercase", letterSpacing: ".08em" }}>Total bill</p>
-              <div style={{ fontSize: "1.4rem", fontWeight: 900, color: "#0e5f4d", letterSpacing: "-.06em", marginTop: 6 }}>{formatMoney(bill.amount_minor)}</div>
+              <p style={{ fontSize: ".7rem", color: "#7b8398", fontWeight: 800, textTransform: "uppercase", letterSpacing: ".08em" }}>Total bill</p>
+              <div style={{ fontSize: "1.4rem", fontWeight: 900, color: "#242f49", letterSpacing: "-.06em", marginTop: 6 }}>{formatMoney(bill.amount_minor)}</div>
             </div>
             <div style={{ padding: 22, borderRadius: 18, background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
-              <p style={{ fontSize: ".7rem", color: "#81948b", fontWeight: 800, textTransform: "uppercase", letterSpacing: ".08em" }}>Received</p>
-              <div style={{ fontSize: "1.4rem", fontWeight: 900, color: "#287153", letterSpacing: "-.06em", marginTop: 6 }}>{formatMoney(bill.amount_paid_minor)}</div>
+              <p style={{ fontSize: ".7rem", color: "#7b8398", fontWeight: 800, textTransform: "uppercase", letterSpacing: ".08em" }}>Received</p>
+              <div style={{ fontSize: "1.4rem", fontWeight: 900, color: "#242f49", letterSpacing: "-.06em", marginTop: 6 }}>{formatMoney(bill.amount_paid_minor)}</div>
             </div>
             <div style={{ padding: 22, borderRadius: 18, background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
-              <p style={{ fontSize: ".7rem", color: "#81948b", fontWeight: 800, textTransform: "uppercase", letterSpacing: ".08em" }}>Remaining</p>
-              <div style={{ fontSize: "1.4rem", fontWeight: 900, color: "#99733e", letterSpacing: "-.06em", marginTop: 6 }}>{formatMoney(bill.remaining_balance_minor)}</div>
+              <p style={{ fontSize: ".7rem", color: "#7b8398", fontWeight: 800, textTransform: "uppercase", letterSpacing: ".08em" }}>Remaining</p>
+              <div style={{ fontSize: "1.4rem", fontWeight: 900, color: "#541a2e", letterSpacing: "-.06em", marginTop: 6 }}>{formatMoney(bill.remaining_balance_minor)}</div>
             </div>
           </div>
 
@@ -183,10 +183,10 @@ export default function BillDetailPage() {
                 <div className="progress-fill" style={{ width: `${progress}%` }} />
               </div>
             </div>
-            <div style={{ display: "flex", gap: 24, marginTop: 16, fontSize: ".78rem", color: "#6d8278" }}>
-              <span>Patient: <strong style={{ color: "#173c31" }}>{bill.patient_name}</strong></span>
-              <span>Due: <strong style={{ color: "#173c31" }}>{formatDate(bill.due_date)}</strong></span>
-              <span>Created: <strong style={{ color: "#173c31" }}>{formatDate(bill.created_at)}</strong></span>
+            <div style={{ display: "flex", gap: 24, marginTop: 16, fontSize: ".78rem", color: "#5b6478" }}>
+              <span>Patient: <strong style={{ color: "#161b2f" }}>{bill.patient_name}</strong></span>
+              <span>Due: <strong style={{ color: "#161b2f" }}>{formatDate(bill.due_date)}</strong></span>
+              <span>Created: <strong style={{ color: "#161b2f" }}>{formatDate(bill.created_at)}</strong></span>
             </div>
           </div>
 
@@ -195,7 +195,7 @@ export default function BillDetailPage() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
               <div>
                 <h3 style={{ fontSize: "1rem", fontWeight: 800, letterSpacing: "-.04em" }}>Payment history</h3>
-                <p style={{ fontSize: ".76rem", color: "#81948b", marginTop: 2 }}>{payments.length} contribution{payments.length !== 1 ? "s" : ""}</p>
+                <p style={{ fontSize: ".76rem", color: "#7b8398", marginTop: 2 }}>{payments.length} contribution{payments.length !== 1 ? "s" : ""}</p>
               </div>
               {shareUrl && (
                 <Link href={`/pay/${shareUrl.split("/pay/")[1] || ""}`} className="outline-button" style={{ padding: "6px 14px", fontSize: ".76rem", minHeight: "auto" }}>
@@ -205,8 +205,8 @@ export default function BillDetailPage() {
             </div>
 
             {payments.length === 0 ? (
-              <div style={{ padding: 32, textAlign: "center", color: "#81948b", fontSize: ".84rem" }}>
-                <HeartHandshake size={28} style={{ margin: "0 auto 12px", color: "#c7dfc7" }} />
+              <div style={{ padding: 32, textAlign: "center", color: "#7b8398", fontSize: ".84rem" }}>
+                <HeartHandshake size={28} style={{ margin: "0 auto 12px", color: "#ffc9b8" }} />
                 <p>No contributions yet.</p>
                 <p style={{ fontSize: ".76rem", marginTop: 4 }}>Share the payment link to start receiving support.</p>
               </div>
@@ -215,8 +215,8 @@ export default function BillDetailPage() {
                 {/* Table header */}
                 <div style={{
                   display: "grid", gridTemplateColumns: "1fr 120px 100px 140px",
-                  padding: "10px 12px", fontSize: ".66rem", fontWeight: 800, color: "#84968d",
-                  textTransform: "uppercase", letterSpacing: ".08em", borderBottom: "1px solid #edf1eb",
+                  padding: "10px 12px", fontSize: ".66rem", fontWeight: 800, color: "#7b8398",
+                  textTransform: "uppercase", letterSpacing: ".08em", borderBottom: "1px solid #f1e9e4",
                 }}>
                   <span>Contributor</span>
                   <span>Amount</span>
@@ -226,28 +226,28 @@ export default function BillDetailPage() {
                 {payments.map((p) => (
                   <div key={p.id} style={{
                     display: "grid", gridTemplateColumns: "1fr 120px 100px 140px",
-                    padding: "14px 12px", borderBottom: "1px solid #f4f6f3",
+                    padding: "14px 12px", borderBottom: "1px solid #f6f1ee",
                     fontSize: ".82rem", alignItems: "center",
                   }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <div style={{
-                        width: 32, height: 32, borderRadius: 10, background: "#e7f2dc",
-                        display: "grid", placeItems: "center", fontSize: ".68rem", fontWeight: 800, color: "#0e5f4d",
+                        width: 32, height: 32, borderRadius: 10, background: "#ffe9e0",
+                        display: "grid", placeItems: "center", fontSize: ".68rem", fontWeight: 800, color: "#242f49",
                       }}>
                         {p.contributor_name ? p.contributor_name.split(" ").map((w: string) => w[0]).join("").slice(0, 2) : "??"}
                       </div>
                       <div>
-                        <div style={{ fontWeight: 700, color: "#173c31" }}>{p.contributor_name || "Anonymous"}</div>
-                        <div style={{ fontSize: ".68rem", color: "#81948b" }}>{p.payment_reference?.slice(0, 12) || "—"}</div>
+                        <div style={{ fontWeight: 700, color: "#161b2f" }}>{p.contributor_name || "Anonymous"}</div>
+                        <div style={{ fontSize: ".68rem", color: "#7b8398" }}>{p.payment_reference?.slice(0, 12) || "—"}</div>
                       </div>
                     </div>
-                    <div style={{ fontWeight: 800, color: "#0e5f4d" }}>{formatMoney(p.amount_minor)}</div>
+                    <div style={{ fontWeight: 800, color: "#242f49" }}>{formatMoney(p.amount_minor)}</div>
                     <div>
                       <span className={`tiny-status ${p.status.toLowerCase()}`} style={{ fontSize: ".68rem" }}>
                         {p.status === "COMPLETED" ? "Confirmed" : p.status === "PENDING" ? "Pending" : p.status}
                       </span>
                     </div>
-                    <div style={{ fontSize: ".76rem", color: "#6d8278" }}>{formatDateTime(p.created_at)}</div>
+                    <div style={{ fontSize: ".76rem", color: "#5b6478" }}>{formatDateTime(p.created_at)}</div>
                   </div>
                 ))}
               </div>
@@ -259,23 +259,23 @@ export default function BillDetailPage() {
         <div style={{ position: "sticky", top: 24 }}>
           <div style={{ padding: 24, borderRadius: 22, background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 12, background: "#e7f2dc", display: "grid", placeItems: "center" }}>
-                <Copy size={16} color="#0e5f4d" />
+              <div style={{ width: 36, height: 36, borderRadius: 12, background: "#ffe9e0", display: "grid", placeItems: "center" }}>
+                <Copy size={16} color="#242f49" />
               </div>
               <div>
                 <h3 style={{ fontSize: ".92rem", fontWeight: 800 }}>Share this bill</h3>
-                <p style={{ fontSize: ".72rem", color: "#81948b" }}>Send the payment link to supporters</p>
+                <p style={{ fontSize: ".72rem", color: "#7b8398" }}>Send the payment link to supporters</p>
               </div>
             </div>
 
-            <div style={{ display: "grid", placeItems: "center", padding: 16, background: "#f5f8f1", borderRadius: 16, marginBottom: 16 }}>
-              <QRCodeSVG value={shareUrl || "https://brivia.app"} size={140} bgColor="#f5f8f1" fgColor="#0e5f4d" level="M" includeMargin />
+            <div style={{ display: "grid", placeItems: "center", padding: 16, background: "#fdf3ef", borderRadius: 16, marginBottom: 16 }}>
+              <QRCodeSVG value={shareUrl || "https://brivia.app"} size={140} bgColor="#fdf3ef" fgColor="#242f49" level="M" includeMargin />
             </div>
 
-            <div style={{ fontSize: ".68rem", fontWeight: 800, color: "#72877c", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 6 }}>
+            <div style={{ fontSize: ".68rem", fontWeight: 800, color: "#5b6478", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 6 }}>
               Payment link
             </div>
-            <div style={{ padding: "10px 12px", borderRadius: 10, background: "#f0f5ef", fontSize: ".72rem", color: "#3b6655", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 12 }}>
+            <div style={{ padding: "10px 12px", borderRadius: 10, background: "#f7f1ed", fontSize: ".72rem", color: "#384358", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 12 }}>
               {shareUrl ? shareUrl.replace(/^https?:\/\//, "") : "Loading..."}
             </div>
 
