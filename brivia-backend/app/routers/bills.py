@@ -38,7 +38,7 @@ async def list_my_bills(user: dict = Depends(get_current_user)):
     """List bills for the authenticated user."""
     if user["role"] == "provider":
         return await get_bills_for_provider(user["id"])
-    return await get_bills_for_patient(user["name"])
+    return await get_bills_for_patient(user["id"], user["name"])
 
 
 @router.get("/{bill_id}", response_model=BillResponse)

@@ -29,12 +29,14 @@ class PaymentProvider:
 
 
 # --- Platform fee ---
-PLATFORM_FEE_PERCENT = 2  # 2% goes to Brivia
+PLATFORM_FEE_BPS = 30  # 0.3% goes to Brivia
+PLATFORM_FEE_FIXED_MINOR = 5000  # ₦50 in kobo-equivalent minor units
 
 
 def calculate_platform_fee(amount_minor: int) -> int:
-    """Calculate the Brivia platform fee (2% of the contribution)."""
-    return max(int(amount_minor * PLATFORM_FEE_PERCENT / 100), 1)  # minimum 1 unit
+    """Calculate Brivia's 0.3% + ₦50 transaction fee in minor units."""
+    percentage_fee = (amount_minor * PLATFORM_FEE_BPS + 9999) // 10000
+    return min(amount_minor, percentage_fee + PLATFORM_FEE_FIXED_MINOR)
 
 
 class MockPaymentProvider(PaymentProvider):
@@ -139,7 +141,7 @@ async def initiate_contribution(
             f"Amount exceeds remaining balance of {bill['remaining_balance_minor']} {bill['currency']}."
         )
 
-    # --- Calculate platform fee (2% to Brivia) ---
+    # --- Calculate platform fee (0.3% + ₦50 to Brivia) ---
     platform_fee = calculate_platform_fee(data.amount_minor)
     net_amount = data.amount_minor - platform_fee
 

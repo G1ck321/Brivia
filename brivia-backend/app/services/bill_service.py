@@ -60,10 +60,19 @@ async def create_bill(provider_id: str, data: BillCreate) -> BillResponse:
     public_bill_id = _generate_public_bill_id(settings)
     share_token = _generate_share_token(settings)
 
+    patient_id = None
+    if data.patient_email:
+        patient_result = (
+            db.table("users").select("id").eq("email", str(data.patient_email).lower()).limit(1).execute()
+        )
+        if patient_result.data:
+            patient_id = patient_result.data[0]["id"]
+
     bill_record = {
         "id": bill_id,
         "public_bill_id": public_bill_id,
         "provider_id": provider_id,
+        "patient_id": patient_id,
         "patient_name": data.patient_name,
         "description": data.description,
         "amount_minor": data.amount_minor,
@@ -107,13 +116,13 @@ async def get_bills_for_provider(provider_id: str) -> list[BillResponse]:
     return [_bill_row_to_response(row) for row in result.data]
 
 
-async def get_bills_for_patient(patient_name: str) -> list[BillResponse]:
-    """List all bills for a patient by name (MVP simplification)."""
+async def get_bills_for_patient(patient_id: str, patient_name: str) -> list[BillResponse]:
+    """List bills linked to the patient, with a name fallback for legacy bills."""
     db = get_supabase()
     result = (
         db.table("bills")
         .select("*")
-        .eq("patient_name", patient_name)
+        .or_(f"patient_id.eq.{patient_id},patient_name.eq.{patient_name}")
         .order("created_at", desc=True)
         .execute()
     )
