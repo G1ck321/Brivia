@@ -117,16 +117,31 @@ async def get_bills_for_provider(provider_id: str) -> list[BillResponse]:
 
 
 async def get_bills_for_patient(patient_id: str, patient_name: str) -> list[BillResponse]:
-    """List bills linked to the patient, with a name fallback for legacy bills."""
+    """List bills linked to the patient, with a name fallback for legacy bills.
+
+    Legacy bills predate the ``patient_id`` column and only carry the
+    denormalized ``patient_name``, so both conditions have to match. They are
+    queried separately and merged instead of using a single PostgREST ``or=``
+    filter, which splits its value list on commas and would therefore break for
+    names like ``"Okafor, Chidi"`` (and inject unescaped text into the filter).
+    """
     db = get_supabase()
-    result = (
-        db.table("bills")
-        .select("*")
-        .or_(f"patient_id.eq.{patient_id},patient_name.eq.{patient_name}")
-        .order("created_at", desc=True)
-        .execute()
-    )
-    return [_bill_row_to_response(row) for row in result.data]
+
+    bills_by_id: dict[str, dict] = {}
+    for column, value in (("patient_id", patient_id), ("patient_name", patient_name)):
+        result = (
+            db.table("bills")
+            .select("*")
+            .eq(column, value)
+            .order("created_at", desc=True)
+            .execute()
+        )
+        for row in result.data:
+            bills_by_id[row["id"]] = row
+
+    # Both queries are already sorted desc; merge them back into one list.
+    merged = sorted(bills_by_id.values(), key=lambda row: row.get("created_at") or "", reverse=True)
+    return [_bill_row_to_response(row) for row in merged]
 
 
 async def get_bill_by_id(bill_id: str) -> BillResponse | None:
