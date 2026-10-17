@@ -145,7 +145,7 @@ async def initiate_open_payments(share_token: str, data: OpenPaymentsInitiateReq
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to set up incoming payment: {str(e)}"
+                detail=f"Failed to set up incoming payment: "
             )
 
     # Create payment record
@@ -169,6 +169,10 @@ async def initiate_open_payments(share_token: str, data: OpenPaymentsInitiateReq
     db.table("payments").insert(payment_record).execute()
 
     # Initiate outgoing payment grant via OP server
+    # The authorization server redirects the contributor's browser back to this
+    # exact URL once they approve, so it must identify the payment.
+    frontend_origin = (settings.CORS_ORIGINS.split(",")[0] or "").strip().rstrip("/")
+    callback_url = f"{frontend_origin}/pay/{share_token}/callback?payment_id={payment_id}"
     try:
         import httpx
         op_url = get_op_server_url()
@@ -179,6 +183,7 @@ async def initiate_open_payments(share_token: str, data: OpenPaymentsInitiateReq
                     "sender_wallet_url": data.sender_wallet_url,
                     "incoming_payment_url": incoming_payment_id,
                     "amount_minor": data.amount_minor,
+                    "callback_url": callback_url,
                 },
             )
             resp.raise_for_status()
@@ -210,6 +215,8 @@ async def initiate_open_payments(share_token: str, data: OpenPaymentsInitiateReq
             "bill_id": bill_id,
             "incoming_payment_id": incoming_payment_id,
             "sender_wallet_url": data.sender_wallet_url,
+            "callback_url": callback_url,
+            "finish_nonce": grant_result.get("finish_nonce"),
         },
         "created_at": now,
     }).execute()
@@ -225,11 +232,17 @@ async def initiate_open_payments(share_token: str, data: OpenPaymentsInitiateReq
 async def open_payments_callback(
     share_token: str,
     payment_id: str = Query(...),
+    interact_ref: str | None = Query(None),
     interact_hash: str | None = Query(None),
+    hash: str | None = Query(None),
 ):
     """
     Callback after user approves the payment in their wallet.
     Finalizes the grant and executes the outgoing payment.
+
+    ``interact_ref`` is the interaction reference the authorization server
+    appends to the finish redirect. It is required by GNAP when continuing an
+    interactive grant — without it the AS answers ``invalid_interaction``.
     """
     settings = get_settings()
     db = get_supabase()
@@ -316,6 +329,7 @@ async def open_payments_callback(
                     "incoming_payment_id": incoming_payment_id,
                     "amount_minor": payment["amount_minor"],
                     "description": "Brivia bill contribution",
+                    "interact_ref": interact_ref,
                 },
             )
             resp.raise_for_status()

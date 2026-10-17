@@ -15,6 +15,7 @@
  */
 
 import http from "node:http";
+import { randomUUID } from "node:crypto";
 import OpenPayments from "@interledger/open-payments";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -143,16 +144,16 @@ async function handleRequest(req, res) {
 
     // --- POST /initiate-outgoing ---
     if (url.pathname === "/initiate-outgoing") {
-      const { sender_wallet_url, incoming_payment_url, amount_minor } = body;
-      const result = await initiateOutgoingPayment(sender_wallet_url, incoming_payment_url, amount_minor);
+      const { sender_wallet_url, incoming_payment_url, amount_minor, callback_url } = body;
+      const result = await initiateOutgoingPayment(sender_wallet_url, incoming_payment_url, amount_minor, callback_url);
       respond(res, 200, result);
       return;
     }
 
     // --- POST /finalize-payment ---
     if (url.pathname === "/finalize-payment") {
-      const { continue_uri, continue_token, sender_wallet_url, incoming_payment_id, amount_minor, description } = body;
-      const result = await finalizeAndPay(continue_uri, continue_token, sender_wallet_url, incoming_payment_id, amount_minor, description);
+      const { continue_uri, continue_token, sender_wallet_url, incoming_payment_id, amount_minor, description, interact_ref } = body;
+      const result = await finalizeAndPay(continue_uri, continue_token, sender_wallet_url, incoming_payment_id, amount_minor, description, interact_ref);
       respond(res, 200, result);
       return;
     }
@@ -227,7 +228,7 @@ async function setupIncomingPayment(receiverWalletUrl, amountMinor, reference) {
   };
 }
 
-async function initiateOutgoingPayment(senderWalletUrl, incomingPaymentUrl, amountMinor) {
+async function initiateOutgoingPayment(senderWalletUrl, incomingPaymentUrl, amountMinor, callbackUrl) {
   const c = await getClient();
 
   const wallet = await c.walletAddress.get({ url: senderWalletUrl });
@@ -263,6 +264,18 @@ async function initiateOutgoingPayment(senderWalletUrl, incomingPaymentUrl, amou
 
   console.log(`[initiate-outgoing] quote OK debit=${quote.debitAmount.value} receive=${quote.receiveAmount.value}`);
 
+  // A grant request that starts an interaction must also say where to FINISH it.
+  // Without `interact.finish` the authorization server has nowhere to send the
+  // user's browser, so after approving in the wallet they are left on a dead-end
+  // page and our callback never runs.
+  const finishNonce = randomUUID();
+  const interact = { start: ["redirect"] };
+  if (callbackUrl) {
+    interact.finish = { method: "redirect", uri: callbackUrl, nonce: finishNonce };
+  } else {
+    console.warn("[initiate-outgoing] no callback_url supplied — user will NOT be redirected back");
+  }
+
   // Step 2: Request outgoing payment grant with quote.debitAmount as limit
   const grant = await c.grant.request(
     { url: wallet.authServer },
@@ -277,7 +290,7 @@ async function initiateOutgoingPayment(senderWalletUrl, incomingPaymentUrl, amou
           },
         ],
       },
-      interact: { start: ["redirect"] },
+      interact,
     },
   );
 
@@ -292,18 +305,25 @@ async function initiateOutgoingPayment(senderWalletUrl, incomingPaymentUrl, amou
     continue_uri: grant.continue.uri,
     continue_token: grant.continue.access_token.value,
     quote_id: quote.id,
+    finish_nonce: finishNonce,
   };
 }
 
-async function finalizeAndPay(continueUri, continueToken, senderWalletUrl, incomingPaymentUrl, amountMinor, description) {
+async function finalizeAndPay(continueUri, continueToken, senderWalletUrl, incomingPaymentUrl, amountMinor, description, interactRef) {
   const c = await getClient();
-  console.log(`[finalize] incoming=${incomingPaymentUrl} amount=${amountMinor}`);
+  console.log(`[finalize] incoming=${incomingPaymentUrl} amount=${amountMinor} interact_ref=${interactRef ? "present" : "MISSING"}`);
 
-  // Finalize grant after user approval
-  const grant = await c.grant.continue({
-    url: continueUri,
-    accessToken: continueToken,
-  });
+  // Finalize grant after user approval.
+  // GNAP requires the interaction reference that the authorization server
+  // appended to the finish redirect. Without it the AS rejects the
+  // continuation with `invalid_interaction` and the grant can never be granted.
+  const grant = await c.grant.continue(
+    {
+      url: continueUri,
+      accessToken: continueToken,
+    },
+    interactRef ? { interact_ref: interactRef } : undefined,
+  );
 
   if (!isFinalizedGrant(grant)) {
     throw new Error("Grant not finalized");
