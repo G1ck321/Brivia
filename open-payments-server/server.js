@@ -118,9 +118,15 @@ async function handleRequest(req, res) {
 
   try {
     // Health check
-    if (url.pathname === "/health" && req.method === "GET") {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ status: "ok", service: "brivia-open-payments" }));
+    if (url.pathname === "/health" && (req.method === "GET" || req.method === "HEAD")) {
+      if (req.method === "HEAD") {
+    res.end();
+  } else {
+    res.end(JSON.stringify({
+      status: "ok",
+      service: "brivia-open-payments"
+    }));
+      }
       return;
     }
 
