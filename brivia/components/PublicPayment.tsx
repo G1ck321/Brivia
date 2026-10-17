@@ -48,18 +48,31 @@ export default function PublicPayment() {
   const [error, setError] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [payment, setPayment] = useState<Payment | null>(null);
-  const [hasPendingPayment, setHasPendingPayment] = useState(false);
+  // An Open Payments grant is awaiting wallet approval. Seeded from
+  // localStorage on first render so the prompt survives a reload — the
+  // contributor may be away in their wallet for a while.
+  const [hasPendingPayment, setHasPendingPayment] = useState(
+    () => typeof window !== "undefined" && !!localStorage.getItem("brivia_op_payment_id")
+  );
   const idempotencyKey = useRef(`idem-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
   useEffect(() => {
-    // Detect if user returned from wallet approval
-    if (typeof window !== "undefined") {
-      const pendingPaymentId = localStorage.getItem("brivia_op_payment_id");
-      if (pendingPaymentId) {
-        setHasPendingPayment(true);
-      }
+    // The wallet redirects the approval tab back to our callback page, which
+    // posts the result to whatever opened it. Refresh so the updated balance
+    // shows without a manual reload.
+    function onMessage(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data as { type?: string; token?: string } | null;
+      if (data?.type !== "brivia:payment-complete" || data.token !== token) return;
+      setHasPendingPayment(false);
+      localStorage.removeItem("brivia_op_payment_id");
+      localStorage.removeItem("brivia_op_share_token");
+      getPublicBill(token).then(setBill).catch(() => {});
     }
-  }, []);
+
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [token]);
 
   useEffect(() => {
     if (!token) return;
@@ -118,6 +131,9 @@ export default function PublicPayment() {
         // Store payment_id in localStorage so callback page can find it
         localStorage.setItem("brivia_op_payment_id", result.payment_id);
         localStorage.setItem("brivia_op_share_token", token);
+        // Surface the "check payment status" prompt immediately — the
+        // contributor is about to leave for their wallet.
+        setHasPendingPayment(true);
         walletWindow.location.href = result.redirect_url;
         return;
       }
@@ -194,29 +210,28 @@ export default function PublicPayment() {
                 <Loader2 size={22} color="#fff" className="animate-spin-slow" />
               </div>
               <div style={{ flex: 1 }}>
-                <p style={{ margin: 0, fontWeight: 700, fontSize: ".95rem", color: "#161b2f" }}>Waiting for your confirmation</p>
+                <p style={{ margin: 0, fontWeight: 700, fontSize: ".95rem", color: "#161b2f" }}>You have a payment waiting</p>
                 <p style={{ margin: "4px 0 0", fontSize: ".82rem", color: "#161b2f" }}>
-                  You approved this payment in your wallet. Tap the button below to confirm and complete it.
+                  Approve it in your wallet, then press <strong>Check payment status</strong> below to finish.
                 </p>
                 <Link
                   href={`/pay/${token}/callback`}
-                  target="_blank"
-                  rel="noopener noreferrer"
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
                     gap: 8,
                     marginTop: 12,
-                    padding: "12px 24px",
+                    padding: "14px 28px",
                     borderRadius: 12,
                     background: "#242f49",
                     color: "white",
-                    fontWeight: 700,
-                    fontSize: ".9rem",
+                    fontWeight: 800,
+                    fontSize: ".95rem",
                     textDecoration: "none",
+                    boxShadow: "0 6px 18px rgba(36,47,73,.28)",
                   }}
                 >
-                  <Check size={18} /> Confirm payment now
+                  <Check size={18} /> Check payment status
                 </Link>
               </div>
             </div>
@@ -286,10 +301,15 @@ export default function PublicPayment() {
                   : "Demo mode — simulated payment for testing."
                 }
               </p>
-              {paymentMode === "openpayments" && (
-                <p style={{ marginTop: 8, fontSize: ".75rem", color: "#7b8398" }}>
-                  Already approved? <Link href={`/pay/${token}/callback`} style={{ color: "#242f49", textDecoration: "underline" }}>Check payment status</Link>
-                </p>
+              {paymentMode === "openpayments" && !hasPendingPayment && (
+                <button
+                  type="button"
+                  className="outline-button full"
+                  style={{ marginTop: 4 }}
+                  onClick={() => { window.location.href = `/pay/${token}/callback`; }}
+                >
+                  Check payment status
+                </button>
               )}
             </form>
           )}

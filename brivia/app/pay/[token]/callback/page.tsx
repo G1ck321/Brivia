@@ -21,6 +21,9 @@ export default function OpenPaymentsCallback() {
   const searchParams = useSearchParams();
   const token = (params?.token as string) ?? "";
   const paymentId = searchParams.get("payment_id") ?? "";
+  // Interaction reference appended by the authorization server to the finish
+  // redirect. Required to continue the grant.
+  const interactRef = searchParams.get("interact_ref") ?? "";
 
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [payment, setPayment] = useState<Payment | null>(null);
@@ -30,6 +33,7 @@ export default function OpenPaymentsCallback() {
   const [platformFee, setPlatformFee] = useState(0);
   const [netAmount, setNetAmount] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
+  const [openedAsPopup, setOpenedAsPopup] = useState(false);
 
   useEffect(() => {
     // Get payment_id from URL or localStorage
@@ -51,7 +55,7 @@ export default function OpenPaymentsCallback() {
 
     async function poll() {
       try {
-        const result = await getOpenPaymentsCallback(effectiveToken, effectivePaymentId);
+        const result = await getOpenPaymentsCallback(effectiveToken, effectivePaymentId, interactRef || undefined);
         if (!active) return;
         setPayment(result.payment);
         setBillStatus(result.bill_status);
@@ -63,6 +67,17 @@ export default function OpenPaymentsCallback() {
         // Clean up localStorage
         localStorage.removeItem("brivia_op_payment_id");
         localStorage.removeItem("brivia_op_share_token");
+
+        // If the wallet redirected this tab back, it was opened from the bill
+        // page — hand the result over and let this tab close itself.
+        const parent = window.opener;
+        if (parent && !parent.closed) {
+          setOpenedAsPopup(true);
+          parent.postMessage(
+            { type: "brivia:payment-complete", token: effectiveToken, paymentId: effectivePaymentId },
+            window.location.origin
+          );
+        }
       } catch (err) {
         attempts++;
         // 409 means the network is still settling — keep polling
@@ -81,7 +96,16 @@ export default function OpenPaymentsCallback() {
     setTimeout(poll, 1500);
 
     return () => { active = false; };
-  }, [token, paymentId]);
+  }, [token, paymentId, interactRef]);
+
+  // The wallet redirected this tab back from the approval screen. Once the
+  // payment is confirmed there is nothing left to see here — close it so the
+  // contributor lands back on the bill page they started from.
+  useEffect(() => {
+    if (status !== "success" || !openedAsPopup) return;
+    const timer = setTimeout(() => window.close(), 1800);
+    return () => clearTimeout(timer);
+  }, [status, openedAsPopup]);
 
   if (status === "loading") {
     return (
@@ -130,6 +154,14 @@ export default function OpenPaymentsCallback() {
       </header>
       <main className="receipt-layout">
         <section className="receipt-card">
+          {openedAsPopup && (
+            <div style={{ marginBottom: 20, padding: 16, borderRadius: 14, background: "#ffe4d8", display: "flex", alignItems: "center", gap: 10 }}>
+              <Check size={18} color="#242f49" />
+              <span style={{ fontSize: ".84rem", color: "#161b2f", fontWeight: 600 }}>
+                Done — this window closes automatically.
+              </span>
+            </div>
+          )}
           <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#ffe4d8", display: "grid", placeItems: "center", marginBottom: 16 }}>
             <Check size={36} color="#242f49" strokeWidth={3} />
           </div>

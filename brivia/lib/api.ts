@@ -262,8 +262,15 @@ export async function initiateOpenPayments(
 
 export async function getOpenPaymentsCallback(
   shareToken: string,
-  paymentId: string
+  paymentId: string,
+  interactRef?: string
 ) {
+  // `interact_ref` is the interaction reference the authorization server
+  // appended to the finish redirect. The backend needs it to continue the
+  // grant; without it the AS rejects with `invalid_interaction`.
+  const query = new URLSearchParams({ payment_id: paymentId });
+  if (interactRef) query.set("interact_ref", interactRef);
+
   return apiRequest<{
     payment: Payment;
     bill_status: string;
@@ -272,7 +279,7 @@ export async function getOpenPaymentsCallback(
     platform_fee: number;
     net_amount: number;
     message: string;
-  }>(`/public/bills/${shareToken}/pay/callback?payment_id=${paymentId}`);
+  }>(`/public/bills/${shareToken}/pay/callback?${query.toString()}`);
 }
 
 export async function pollSettlement(billId: string) {
