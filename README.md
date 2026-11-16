@@ -217,7 +217,7 @@ OP_PRIVATE_KEY_PATH=private.key
 | `brivia/` | Next.js app: `/`, `/auth`, `/provider/create`, `/patient`, `/bills/[id]`, `/pay/[token]`, `/pay/[token]/callback`, `/settings` |
 | `brivia-backend/` | FastAPI app, routers, services, Supabase schema in `supabase_migration.sql`, `seed.py` |
 | `open-payments-server/` | OP HTTP API (`server.js`), annotated transfer scripts, 7-day learning guide |
-| `DOCUMENTATION.md` | Long-form reference (some sections predate the current fee model) |
+| `DOCUMENTATION.md` | Long-form reference |
 | `USER_FLOW.md` | Role-by-role walkthrough |
 | `RENDER_DEPLOY.md`, `render.yaml` | Deployment guide and blueprint |
 | `BUDGET.md` | Running-cost plan |
@@ -233,4 +233,3 @@ Honest list before anyone treats this as production:
 - **No webhooks.** Settlement is a callback plus polling; a background reconciler is needed for payments that settle after the browser tab closes.
 - **One receiving wallet per deployment.** Multi-tenant provider payouts are not modelled yet.
 - **No automated tests.** Verification is manual.
-- `DOCUMENTATION.md` describes an older flat 2% fee; the code implements 0.3% + ₦50.

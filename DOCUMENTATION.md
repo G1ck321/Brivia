@@ -24,7 +24,7 @@
 
 Brivia lets **healthcare providers** create verified bills, **patients** share those bills with their support network, and **contributors** (family, friends, organizations) make transparent payments against specific bills.
 
-Every payment is recorded on-chain through Interledger/Open Payments. Brivia takes a **2% platform fee** on each contribution.
+Every payment is recorded on-chain through Interledger/Open Payments. Brivia takes a **0.3% + ₦50 platform fee** on each contribution.
 
 **Core problem solved:** When someone needs medical care they can't afford, the process of coordinating payments from multiple people is messy, opaque, and error-prone. Brivia makes it transparent and traceable.
 
@@ -180,7 +180,7 @@ brivia/                          ← Root workspace
 | `app/routers/payments.py` | Payment listing + Open Payments integration endpoints |
 | `app/services/auth_service.py` | Registration (hash + insert), login (verify + JWT), user lookup |
 | `app/services/bill_service.py` | Bill creation (generates BRV-XXXXXXXX ID + share token), public bill lookup |
-| `app/services/payment_service.py` | **Core payment logic**: mock provider, 2% platform fee, idempotency, audit logs, Open Payments hooks |
+| `app/services/payment_service.py` | **Core payment logic**: mock provider, 0.3% + ₦50 platform fee, idempotency, audit logs, Open Payments hooks |
 | `app/schema/schemas.py` | All Pydantic models: UserRegister, BillCreate, PaymentCreate, enums (UserRole, BillStatus, PaymentStatus) |
 | `seed.py` | Creates demo accounts + bill in Supabase |
 | `supabase_migration.sql` | Database DDL — users, bills, payments, audit_logs tables |
@@ -271,10 +271,10 @@ These are the **demo-ready, investor-visible features**:
 - ✅ "Fully funded" message when bill reaches ₦0 remaining
 
 ### 4. Platform Economics
-- ✅ **2% platform fee** on every contribution
+- ✅ **0.3% + ₦50 platform fee** on every contribution, capped at the contribution amount
 - ✅ Fee recorded in audit log
 - ✅ Bill balance tracks net amount (after fee)
-- ✅ Example: ₦10,000 contribution → ₦9,800 to bill, ₦200 to Brivia
+- ✅ Example: ₦10,000 contribution → ₦9,920 to bill, ₦80 to Brivia (0.3% = ₦30, plus ₦50)
 
 ### 5. Security
 - ✅ JWT authentication (24-hour expiry)
@@ -330,7 +330,7 @@ For a 3-5 minute investor video:
 4. Switch to patient dashboard → same bill, same progress
 
 ### Scene 5: Technical Architecture (30s)
-> "Under the hood, Brivia is built with Next.js App Router on the frontend, FastAPI on the backend, and Supabase for the database. Payments go through a mock provider in demo mode, but the architecture supports Open Payments / Interledger for real cross-border settlements. Every payment is idempotent, audited, and includes a 2% platform fee."
+> "Under the hood, Brivia is built with Next.js App Router on the frontend, FastAPI on the backend, and Supabase for the database. Payments go through a mock provider in demo mode, but the architecture supports Open Payments / Interledger for real cross-border settlements. Every payment is idempotent, audited, and includes a 0.3% + ₦50 platform fee."
 
 ### Scene 6: Open Payments (Optional, 1 min)
 1. Show `transfer.js` with annotations

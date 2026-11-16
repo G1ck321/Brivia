@@ -54,14 +54,14 @@ Provider and patient see updated status
 
 ## Platform Fee
 
-Brivia takes a **2% platform fee** on every contribution. This is:
+Brivia takes a **0.3% + ₦50 platform fee** on every contribution. This is:
 - Deducted automatically before the bill balance is updated
 - Recorded in the audit log for transparency
-- The contributor pays the full amount; 98% goes to the bill, 2% to Brivia
+- The contributor pays the full amount; the fee is deducted from it before the bill balance updates
 
 Example: Contributor pays ₦10,000
-- ₦9,800 goes toward the healthcare bill
-- ₦200 is the Brivia platform fee
+- ₦9,920 goes toward the healthcare bill
+- ₦80 is the Brivia platform fee (0.3% = ₦30, plus ₦50)
 
 ## Running the Demo
 

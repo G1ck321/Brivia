@@ -29,7 +29,7 @@ You're building it yourself. The core platform is already functional:
 | Public payment page | ✅ Done |
 | Auth (JWT + bcrypt) | ✅ Done |
 | Bill CRUD | ✅ Done |
-| 2% platform fee | ✅ Done |
+| 0.3% + ₦50 platform fee | ✅ Done |
 | Mock payment mode | ✅ Done |
 | Open Payments integration | ✅ Done |
 | ILP testnet transfers | ✅ Working |
@@ -94,7 +94,7 @@ You're building it yourself. The core platform is already functional:
 - Provider can create bills
 - Patients can share payment links
 - Contributors can pay (mock mode)
-- 2% platform fee working
+- 0.3% + ₦50 platform fee working
 - Real-time progress tracking
 
 ### ✅ Pilot-Ready (5-10 users)
@@ -138,22 +138,22 @@ Deploy everything, keep 3-month runway:
 | Metric | Value |
 |--------|-------|
 | Monthly infra cost | ₦18,000 |
-| Platform fee | 2% |
-| Break-even volume | ₦18,000 ÷ 0.02 = **₦900,000/month** |
+| Platform fee | 0.3% + ₦50 per contribution |
+| Revenue per ₦55,000 bill | ~₦265 (two contributions, 0.3% + ₦50 each) |
 | Average bill | ₦55,000 |
-| Bills to break even | **~17 bills/month** |
+| Bills to break even | **~68 fully funded bills/month (≈₦3.7M volume)** |
 
 ### First 3 Months (Pilot)
 - 5-10 providers
 - 20-50 bills created
 - ₦1M-3M in volume
-- ₦20K-60K in platform fees
+- ₦5K-₦14K in platform fees (below the ₦18K infra cost — stay on free tiers until ~68 bills/month)
 
 ### Month 6 (Growth)
 - 30-50 providers
 - 100-200 bills/month
 - ₦5M-10M in volume
-- ₦100K-200K in platform fees
+- ₦25K-₦50K in platform fees
 
 ---
 
