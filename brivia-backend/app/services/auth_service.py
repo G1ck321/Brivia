@@ -108,6 +108,25 @@ async def update_user_profile(user_id: str, name: str, facility_name: str | None
     return updated.data[0]
 
 
+async def set_wallet_address(user_id: str, wallet_url: str | None) -> dict:
+    """Set (or clear) the wallet that receives this provider's contributions."""
+    db = get_supabase()
+    value = (wallet_url or "").strip() or None
+
+    if value and not (value.startswith("https://") or value.startswith("http://")):
+        raise ValueError("Wallet address must be an https URL.")
+
+    db.table("users").update({
+        "wallet_address_url": value,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }).eq("id", user_id).execute()
+
+    updated = db.table("users").select("*").eq("id", user_id).limit(1).execute()
+    if not updated.data:
+        raise ValueError("User not found.")
+    return updated.data[0]
+
+
 async def change_user_password(user_id: str, current_password: str, new_password: str) -> None:
     """Change user's password after verifying the current one."""
     db = get_supabase()

@@ -5,14 +5,34 @@ Run:
   uvicorn main:app --reload --port 8000
 """
 
+import asyncio
+from contextlib import asynccontextmanager, suppress
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config.settings import get_settings
 from app.routers import auth, bills, payments, public
+from app.services import reconciler
 import uvicorn
 
 settings = get_settings()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Run the overdue / stale-payment sweeps in the background."""
+    stop_event = asyncio.Event()
+    task = reconciler.start(stop_event)
+    try:
+        yield
+    finally:
+        stop_event.set()
+        if task:
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -21,6 +41,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     redirect_slashes=False,  # Prevent 307 redirects that strip Authorization headers
+    lifespan=lifespan,
 )
 
 # --- CORS ---

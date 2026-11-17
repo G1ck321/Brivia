@@ -16,6 +16,7 @@ from app.schema.schemas import (
     PaymentStatus,
     BillStatus,
 )
+from app.services.ledger import apply_settlement, calculate_platform_fee
 
 
 class PaymentProvider:
@@ -28,15 +29,8 @@ class PaymentProvider:
         raise NotImplementedError
 
 
-# --- Platform fee ---
-PLATFORM_FEE_BPS = 30  # 0.3% goes to Brivia
-PLATFORM_FEE_FIXED_MINOR = 5000  # ₦50 in kobo-equivalent minor units
-
-
-def calculate_platform_fee(amount_minor: int) -> int:
-    """Calculate Brivia's 0.3% + ₦50 transaction fee in minor units."""
-    percentage_fee = (amount_minor * PLATFORM_FEE_BPS + 9999) // 10000
-    return min(amount_minor, percentage_fee + PLATFORM_FEE_FIXED_MINOR)
+# Fee math and settlement bookkeeping live in app.services.ledger so the
+# mock and Open Payments paths can never diverge (gap 5).
 
 
 class MockPaymentProvider(PaymentProvider):
@@ -141,10 +135,6 @@ async def initiate_contribution(
             f"Amount exceeds remaining balance of {bill['remaining_balance_minor']} {bill['currency']}."
         )
 
-    # --- Calculate platform fee (0.3% + ₦50 to Brivia) ---
-    platform_fee = calculate_platform_fee(data.amount_minor)
-    net_amount = data.amount_minor - platform_fee
-
     # --- Create payment record ---
     payment_id = str(secrets.token_hex(16))
     payment_ref = _generate_payment_reference()
@@ -192,38 +182,16 @@ async def initiate_contribution(
         payment_status = PaymentStatus.FAILED
         external_id = None
 
-    # --- Update payment record ---
-    # Bill tracks net amount (after platform fee) as the amount paid
-    new_amount_paid = bill["amount_paid_minor"] + net_amount
-    new_remaining = bill["remaining_balance_minor"] - net_amount
-
+    # --- Settle: bill credit, fee ledger row and audit in one place ---
     if payment_status == PaymentStatus.COMPLETED:
-        # Update bill — only count net amount (after platform fee) toward the bill
-        new_bill_status = BillStatus.PAID.value if new_remaining <= 0 else BillStatus.PARTIALLY_PAID.value
-
-        db.table("bills").update({
-            "amount_paid_minor": new_amount_paid,
-            "remaining_balance_minor": max(new_remaining, 0),
-            "status": new_bill_status,
-            "updated_at": now,
-        }).eq("id", bill_id).execute()
-
-        # Record platform fee for Brivia
-        if platform_fee > 0:
-            _log_audit(db, None, "PLATFORM_FEE", "bill", bill_id, {
-                "payment_id": payment_id,
-                "gross_amount": data.amount_minor,
-                "platform_fee": platform_fee,
-                "net_amount": net_amount,
-                "currency": bill["currency"],
-            })
-
-        # Audit: payment completed
-        _log_audit(db, contributor_id, "PAYMENT_COMPLETED", "payment", payment_id, {
-            "bill_id": bill_id,
-            "amount_minor": data.amount_minor,
-            "new_bill_status": new_bill_status,
-        })
+        apply_settlement(
+            db=db,
+            bill=bill,
+            payment_id=payment_id,
+            gross_amount_minor=data.amount_minor,
+            actor_id=contributor_id,
+            currency=bill["currency"],
+        )
 
     # Update payment status
     db.table("payments").update({

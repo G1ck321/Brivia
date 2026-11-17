@@ -10,7 +10,7 @@ from app.config.token import decode_access_token
 from app.schema.schemas import UserRegister, UserLogin, TokenResponse, UserResponse
 from app.services.auth_service import (
     register_user, login_user, get_user_by_id,
-    update_user_profile, change_user_password,
+    update_user_profile, change_user_password, set_wallet_address,
 )
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -97,6 +97,30 @@ async def update_profile(data: ProfileUpdate, user: dict = Depends(get_current_u
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+class WalletUpdate(BaseModel):
+    wallet_address_url: str | None = Field(
+        default=None, description="Provider wallet that receives contributions"
+    )
+
+
+@router.put("/me/wallet")
+async def update_wallet(data: WalletUpdate, user: dict = Depends(get_current_user)):
+    """Set or clear the wallet address that receives this provider's payments."""
+    if user["role"] != "provider":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only providers can set a receiving wallet.",
+        )
+    try:
+        updated = await set_wallet_address(user["id"], data.wallet_address_url)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    return {
+        "wallet_address_url": updated.get("wallet_address_url"),
+        "message": "Wallet updated.",
+    }
 
 
 @router.post("/change-password")

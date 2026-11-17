@@ -3,7 +3,7 @@
 import secrets
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 
 from app.config.db import get_supabase
@@ -17,14 +17,19 @@ from app.schema.schemas import (
     OpenPaymentsCallbackResponse,
 )
 from app.services.bill_service import get_public_bill_by_token
-from app.services.payment_service import (
-    initiate_contribution,
-    calculate_platform_fee,
-)
+from app.services.ledger import apply_settlement, calculate_platform_fee
+from app.services.payment_service import initiate_contribution
+from app.services.op_grants import consume_grant, load_grant, save_grant
+from app.services.ratelimit import public_rate_limit
+from app.services.wallets import resolve_receiving_wallet
 from app.config.settings import get_settings
 from app.services.open_payments_client import get_op_server_url
 
-router = APIRouter(prefix="/public", tags=["Public"])
+router = APIRouter(
+    prefix="/public",
+    tags=["Public"],
+    dependencies=[Depends(public_rate_limit("public"))],
+)
 
 
 @router.get("/bills/{share_token}", response_model=PublicBillResponse)
@@ -114,7 +119,7 @@ async def initiate_open_payments(share_token: str, data: OpenPaymentsInitiateReq
     incoming_payment_id = bill.get("external_payment_id")
     if not incoming_payment_id:
         # Set up incoming payment via OP server (Node.js SDK handles auth correctly)
-        receiver_wallet = settings.OP_RECEIVING_WALLET_URL
+        receiver_wallet = resolve_receiving_wallet(bill)
         if not receiver_wallet:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -201,25 +206,18 @@ async def initiate_open_payments(share_token: str, data: OpenPaymentsInitiateReq
             detail=f"Failed to initiate payment: {str(e)}"
         )
 
-    # Store grant details in audit log for later continuation
-    db.table("audit_logs").insert({
-        "id": str(secrets.token_hex(16)),
-        "actor_id": None,
-        "action": "OPEN_PAYMENTS_INITIATED",
-        "resource_type": "payment",
-        "resource_id": payment_id,
-        "metadata": {
-            "continue_uri": grant_result["continue_uri"],
-            "continue_token": grant_result["continue_token"],
-            "quote_id": grant_result["quote_id"],
-            "bill_id": bill_id,
-            "incoming_payment_id": incoming_payment_id,
-            "sender_wallet_url": data.sender_wallet_url,
-            "callback_url": callback_url,
-            "finish_nonce": grant_result.get("finish_nonce"),
-        },
-        "created_at": now,
-    }).execute()
+    # Durable grant continuation (op_grants, with audit_logs as fallback)
+    save_grant(db, payment_id, {
+        "continue_uri": grant_result["continue_uri"],
+        "continue_token": grant_result["continue_token"],
+        "interact_redirect": grant_result.get("interact_redirect"),
+        "quote_id": grant_result.get("quote_id"),
+        "bill_id": bill_id,
+        "incoming_payment_id": incoming_payment_id,
+        "sender_wallet_url": data.sender_wallet_url,
+        "callback_url": callback_url,
+        "finish_nonce": grant_result.get("finish_nonce"),
+    })
 
     return OpenPaymentsInitiateResponse(
         payment_id=payment_id,
@@ -296,20 +294,14 @@ async def open_payments_callback(
             detail="This payment has already failed. Please try making a new contribution.",
         )
 
-    # Get grant details from audit log
-    audit_result = (
-        db.table("audit_logs")
-        .select("metadata")
-        .eq("resource_id", payment_id)
-        .eq("action", "OPEN_PAYMENTS_INITIATED")
-        .limit(1)
-        .execute()
-    )
-
-    if not audit_result.data:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Grant details not found.")
-
-    metadata = audit_result.data[0]["metadata"]
+    # Grant continuation is read from op_grants (durable across restarts),
+    # falling back to audit_logs for deployments that predate that table.
+    metadata = load_grant(db, payment_id)
+    if not metadata:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Grant details not found or expired. Please try again.",
+        )
     continue_uri = metadata["continue_uri"]
     continue_token = metadata["continue_token"]
     incoming_payment_id = metadata["incoming_payment_id"]
@@ -343,9 +335,26 @@ async def open_payments_callback(
             detail="Payment is still being processed by the network. Please wait.",
         )
 
-    # Calculate platform fee
-    platform_fee = calculate_platform_fee(payment["amount_minor"])
-    net_amount = payment["amount_minor"] - platform_fee
+    # Credit the bill, record the fee and audit — one implementation shared
+    # with the mock provider path.
+    current_bill_result = db.table("bills").select("*").eq("id", bill_id).limit(1).execute()
+    if not current_bill_result.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found.")
+
+    settlement = apply_settlement(
+        db=db,
+        bill=current_bill_result.data[0],
+        payment_id=payment_id,
+        gross_amount_minor=payment["amount_minor"],
+        actor_id=None,
+        currency=payment.get("currency"),
+    )
+    platform_fee = settlement["fee_minor"]
+    net_amount = settlement["net_minor"]
+    new_bill_status = settlement["bill_status"]
+
+    # A grant is single-use once finalised.
+    consume_grant(db, payment_id)
 
     # Update payment record
     db.table("payments").update({
@@ -353,37 +362,6 @@ async def open_payments_callback(
         "external_payment_id": payment_result.get("payment_id"),
         "updated_at": now,
     }).eq("id", payment_id).execute()
-
-    # Update bill
-    updated_bill_result = db.table("bills").select("*").eq("id", bill_id).limit(1).execute()
-    new_bill_status = "ISSUED"
-    if updated_bill_result.data:
-        current_bill = updated_bill_result.data[0]
-        new_amount_paid = current_bill["amount_paid_minor"] + net_amount
-        new_remaining = current_bill["remaining_balance_minor"] - net_amount
-        new_bill_status = "PAID" if new_remaining <= 0 else "PARTIALLY_PAID"
-
-        db.table("bills").update({
-            "amount_paid_minor": new_amount_paid,
-            "remaining_balance_minor": max(new_remaining, 0),
-            "status": new_bill_status,
-            "updated_at": now,
-        }).eq("id", bill_id).execute()
-
-        # Audit
-        db.table("audit_logs").insert({
-            "id": str(secrets.token_hex(16)),
-            "actor_id": None,
-            "action": "PAYMENT_COMPLETED",
-            "resource_type": "payment",
-            "resource_id": payment_id,
-            "metadata": {
-                "bill_id": bill_id,
-                "amount_minor": payment["amount_minor"],
-                "new_bill_status": new_bill_status,
-            },
-            "created_at": now,
-        }).execute()
 
     # Fetch updated payment
     updated_payment = db.table("payments").select("*").eq("id", payment_id).limit(1).execute()

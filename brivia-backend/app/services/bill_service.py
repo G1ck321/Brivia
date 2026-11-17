@@ -3,7 +3,7 @@ Bill service: create, list, share, and retrieve bills.
 """
 
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.config.db import get_supabase
 from app.config.settings import get_settings
@@ -22,6 +22,15 @@ def _generate_public_bill_id(settings: Settings | None = None) -> str:
         settings = get_settings()
     suffix = secrets.token_hex(settings.BILL_ID_LENGTH // 2).upper()
     return f"{settings.BILL_ID_PREFIX}{suffix}"
+
+
+def _share_expiry(settings: "Settings") -> str | None:
+    """Expiry for a new share link, or None when links never expire."""
+    if settings.SHARE_TOKEN_TTL_DAYS <= 0:
+        return None
+    return (
+        datetime.now(timezone.utc) + timedelta(days=settings.SHARE_TOKEN_TTL_DAYS)
+    ).isoformat()
 
 
 def _generate_share_token(settings: Settings | None = None) -> str:
@@ -92,7 +101,7 @@ async def create_bill(provider_id: str, data: BillCreate) -> BillResponse:
         "id": str(secrets.token_hex(16)),
         "bill_id": bill_id,
         "share_token": share_token,
-        "expires_at": None,
+        "expires_at": _share_expiry(settings),
         "created_at": now,
     }
     db.table("bill_shares").insert(share_record).execute()
@@ -176,7 +185,7 @@ async def create_share_link(bill_id: str) -> BillShareResponse:
         "id": str(secrets.token_hex(16)),
         "bill_id": bill_id,
         "share_token": share_token,
-        "expires_at": None,
+        "expires_at": _share_expiry(settings),
         "created_at": now,
     }
 
@@ -191,6 +200,13 @@ async def create_share_link(bill_id: str) -> BillShareResponse:
     )
 
 
+async def revoke_share_links(bill_id: str) -> int:
+    """Revoke every public link for a bill. Returns the number removed."""
+    db = get_supabase()
+    result = db.table("bill_shares").delete().eq("bill_id", bill_id).execute()
+    return len(result.data or [])
+
+
 async def get_public_bill_by_token(share_token: str) -> tuple[PublicBillResponse, str] | None:
     """
     Get public bill info via a share token.
@@ -200,7 +216,7 @@ async def get_public_bill_by_token(share_token: str) -> tuple[PublicBillResponse
 
     share_result = (
         db.table("bill_shares")
-        .select("bill_id")
+        .select("*")
         .eq("share_token", share_token)
         .limit(1)
         .execute()
@@ -209,7 +225,19 @@ async def get_public_bill_by_token(share_token: str) -> tuple[PublicBillResponse
     if not share_result.data:
         return None
 
-    bill_id = share_result.data[0]["bill_id"]
+    share = share_result.data[0]
+
+    # A share link can now expire; an expired link behaves like a missing one.
+    expires_at = share.get("expires_at")
+    if expires_at:
+        try:
+            parsed = datetime.fromisoformat(str(expires_at).replace("Z", "+00:00"))
+        except ValueError:
+            parsed = None
+        if parsed and parsed < datetime.now(timezone.utc):
+            return None
+
+    bill_id = share["bill_id"]
 
     bill_result = db.table("bills").select("*").eq("id", bill_id).limit(1).execute()
     if not bill_result.data:

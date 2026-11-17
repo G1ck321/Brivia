@@ -12,6 +12,7 @@ from app.services.bill_service import (
     get_bill_by_id,
     get_bills_for_patient,
     create_share_link,
+    revoke_share_links,
 )
 
 router = APIRouter(prefix="/bills", tags=["Bills"])
@@ -62,3 +63,18 @@ async def share_bill(bill_id: str, user: dict = Depends(get_current_user)):
             detail="You can only share bills you created.",
         )
     return await create_share_link(bill_id)
+
+
+@router.delete("/{bill_id}/share", status_code=status.HTTP_200_OK)
+async def revoke_share(bill_id: str, user: dict = Depends(get_current_user)):
+    """Revoke every public link for a bill (provider who owns it only)."""
+    bill = await get_bill_by_id(bill_id)
+    if not bill:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found.")
+    if bill.provider_id != user["id"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only revoke links for bills you created.",
+        )
+    removed = await revoke_share_links(bill_id)
+    return {"revoked": removed, "message": "Share links revoked."}

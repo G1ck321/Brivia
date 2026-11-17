@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     PAYMENT_PROVIDER: str = "mock"  # "mock" | "openpayments"
     IDEMPOTENCY_KEY_LENGTH: int = 32
 
+    # --- Public endpoint protection ---
+    PUBLIC_RATE_LIMIT_PER_MINUTE: int = 60  # 0 disables the limiter
+
     # --- Open Payments ---
     # OP_SERVER_URL must be set in production (e.g. https://brivia-op-server.onrender.com)
     OP_SERVER_URL: str = ""  # Node.js Open Payments server
@@ -36,11 +39,17 @@ class Settings(BaseSettings):
     OP_WALLET_ADDRESS_URL: str = ""  # Provider's wallet address
     OP_RECEIVING_WALLET_URL: str = ""  # Where payments land
     OP_GRANT_SERVER: str = "https://auth.interledger-test.dev"
+    OP_GRANT_TTL_MINUTES: int = 15  # how long a continuation stays usable
+
+    # --- Reconciliation ---
+    RECONCILER_ENABLED: bool = True
+    RECONCILER_INTERVAL_SECONDS: int = 60
 
     # --- Bill ---
     BILL_ID_PREFIX: str = "BRV-"
     BILL_ID_LENGTH: int = 8
     SHARE_TOKEN_LENGTH: int = 40
+    SHARE_TOKEN_TTL_DAYS: int = 30  # 0 means share links never expire
 
     model_config = {
         "env_file": ".env",
