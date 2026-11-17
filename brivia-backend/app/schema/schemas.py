@@ -147,6 +147,7 @@ class OpenPaymentsInitiateRequest(BaseModel):
     amount_minor: int = Field(gt=0)
     contributor_name: str = Field(default="Anonymous", max_length=200)
     sender_wallet_url: str = Field(description="Contributor's wallet URL")
+    line_id: str | None = Field(default=None, description="Claimed bill line (v2)")
 
 
 class OpenPaymentsInitiateResponse(BaseModel):

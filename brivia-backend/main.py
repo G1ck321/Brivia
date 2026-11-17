@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config.settings import get_settings
-from app.routers import auth, bills, payments, public
+from app.routers import auth, bills, payments, public, v2
 from app.services import reconciler
 import uvicorn
 
@@ -59,6 +59,7 @@ app.include_router(auth.router)
 app.include_router(bills.router)
 app.include_router(payments.router)
 app.include_router(public.router)
+app.include_router(v2.router)
 
 
 @app.get("/", tags=["Health"])

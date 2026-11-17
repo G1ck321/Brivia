@@ -22,6 +22,7 @@ from app.services.payment_service import initiate_contribution
 from app.services.op_grants import consume_grant, load_grant, save_grant
 from app.services.ratelimit import public_rate_limit
 from app.services.wallets import resolve_receiving_wallet
+from app.services.v2.lines import allocate_for_payment
 from app.config.settings import get_settings
 from app.services.open_payments_client import get_op_server_url
 
@@ -161,6 +162,7 @@ async def initiate_open_payments(share_token: str, data: OpenPaymentsInitiateReq
         "id": payment_id,
         "bill_id": bill_id,
         "contributor_id": None,
+        "line_id": data.line_id,
         "contributor_name": data.contributor_name,
         "amount_minor": data.amount_minor,
         "currency": bill["currency"],
@@ -352,6 +354,9 @@ async def open_payments_callback(
     platform_fee = settlement["fee_minor"]
     net_amount = settlement["net_minor"]
     new_bill_status = settlement["bill_status"]
+
+    if payment.get("line_id"):
+        allocate_for_payment(db, bill_id, payment["line_id"], net_amount)
 
     # A grant is single-use once finalised.
     consume_grant(db, payment_id)

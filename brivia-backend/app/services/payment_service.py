@@ -89,6 +89,7 @@ async def initiate_contribution(
     bill_id: str,
     data: PaymentCreate,
     contributor_id: str | None = None,
+    line_id: str | None = None,
 ) -> PaymentResponse:
     """
     Initiate a payment contribution to a bill.
@@ -150,6 +151,7 @@ async def initiate_contribution(
         "payment_reference": payment_ref,
         "external_payment_id": None,
         "idempotency_key": data.idempotency_key,
+        "line_id": line_id,
         "created_at": now,
         "updated_at": now,
     }
@@ -184,7 +186,7 @@ async def initiate_contribution(
 
     # --- Settle: bill credit, fee ledger row and audit in one place ---
     if payment_status == PaymentStatus.COMPLETED:
-        apply_settlement(
+        settlement = apply_settlement(
             db=db,
             bill=bill,
             payment_id=payment_id,
@@ -192,6 +194,11 @@ async def initiate_contribution(
             actor_id=contributor_id,
             currency=bill["currency"],
         )
+        if line_id:
+            # v2: credit the claimed line with the net amount.
+            from app.services.v2.lines import allocate_for_payment
+
+            allocate_for_payment(db, bill_id, line_id, settlement["net_minor"])
 
     # Update payment status
     db.table("payments").update({

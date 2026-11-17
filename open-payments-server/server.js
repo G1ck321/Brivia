@@ -156,6 +156,14 @@ async function handleRequest(req, res) {
       return;
     }
 
+    // --- POST /quote-preview ---
+    if (url.pathname === "/quote-preview") {
+      const { sender_wallet_url, incoming_payment_url, amount_minor } = body;
+      const result = await quotePreview(sender_wallet_url, incoming_payment_url, amount_minor);
+      respond(res, 200, result);
+      return;
+    }
+
     // --- POST /finalize-payment ---
     if (url.pathname === "/finalize-payment") {
       const { continue_uri, continue_token, sender_wallet_url, incoming_payment_id, amount_minor, description, interact_ref } = body;
@@ -312,6 +320,51 @@ async function initiateOutgoingPayment(senderWalletUrl, incomingPaymentUrl, amou
     continue_token: grant.continue.access_token.value,
     quote_id: quote.id,
     finish_nonce: finishNonce,
+  };
+}
+
+async function quotePreview(senderWalletUrl, incomingPaymentUrl, amountMinor) {
+  const c = await getClient();
+  const wallet = await c.walletAddress.get({ url: senderWalletUrl });
+
+  const quoteGrant = await c.grant.request(
+    { url: wallet.authServer },
+    {
+      access_token: {
+        access: [{ type: "quote", actions: ["create", "read"] }],
+      },
+    },
+  );
+
+  if (!isFinalizedGrant(quoteGrant)) {
+    throw new Error("Failed to get quote grant");
+  }
+
+  const quote = await c.quote.create(
+    { url: wallet.resourceServer, accessToken: quoteGrant.access_token.value },
+    {
+      walletAddress: wallet.id,
+      receiver: incomingPaymentUrl,
+      debitAmount: {
+        value: amountMinor.toString(),
+        assetCode: wallet.assetCode,
+        assetScale: wallet.assetScale,
+      },
+      method: "ilp",
+    },
+  );
+
+  console.log(
+    `[quote-preview] debit=${quote.debitAmount.value} receive=${quote.receiveAmount.value}`,
+  );
+
+  return {
+    quote_id: quote.id,
+    debit_minor: Number(quote.debitAmount.value),
+    receive_minor: Number(quote.receiveAmount.value),
+    debit_amount: quote.debitAmount,
+    receive_amount: quote.receiveAmount,
+    expires_at: quote.expiresAt || null,
   };
 }
 

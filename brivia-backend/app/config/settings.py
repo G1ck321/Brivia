@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     RECONCILER_ENABLED: bool = True
     RECONCILER_INTERVAL_SECONDS: int = 60
 
+    # --- Telegram (optional; the product works without these) ---
+    TELEGRAM_BOT_TOKEN: str = ""
+    TELEGRAM_BOT_USERNAME: str = ""
+    TELEGRAM_WEBHOOK_SECRET: str = ""
+
     # --- Bill ---
     BILL_ID_PREFIX: str = "BRV-"
     BILL_ID_LENGTH: int = 8
