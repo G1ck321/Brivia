@@ -33,8 +33,6 @@ export default function OpenPaymentsCallback() {
   const [platformFee, setPlatformFee] = useState(0);
   const [netAmount, setNetAmount] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
-  const [openedAsPopup, setOpenedAsPopup] = useState(false);
-
   useEffect(() => {
     // Get payment_id from URL or localStorage
     const effectivePaymentId = paymentId ||
@@ -43,8 +41,10 @@ export default function OpenPaymentsCallback() {
       (typeof window !== "undefined" ? localStorage.getItem("brivia_op_share_token") : "") || "";
 
     if (!effectiveToken || !effectivePaymentId) {
-      setStatus("error");
-      setErrorMessage("Missing payment information. Please return to the payment page and try again.");
+      setTimeout(() => {
+        setStatus("error");
+        setErrorMessage("Missing payment information. Please return to the payment page and try again.");
+      }, 0);
       return;
     }
 
@@ -68,23 +68,19 @@ export default function OpenPaymentsCallback() {
         localStorage.removeItem("brivia_op_payment_id");
         localStorage.removeItem("brivia_op_share_token");
 
-        // If the wallet redirected this tab back, it was opened from the bill
-        // page — hand the result over and let this tab close itself.
+        // If the wallet redirected this tab back, hand the result over to the
+        // bill page that opened it and keep the receipt visible here.
         const parent = window.opener;
         if (parent && !parent.closed) {
-          setOpenedAsPopup(true);
           parent.postMessage(
             { type: "brivia:payment-complete", token: effectiveToken, paymentId: effectivePaymentId },
             window.location.origin
           );
         }
-      } catch (err) {
+      } catch {
         attempts++;
-        // 409 means the network is still settling — keep polling
-        const isStillProcessing = err instanceof Error && err.message.includes("409");
         if (active && attempts < maxAttempts) {
-          const delay = isStillProcessing ? 2500 : 2000;
-          setTimeout(poll, delay);
+          setTimeout(poll, 2500);
         } else if (active) {
           setStatus("error");
           setErrorMessage("Payment could not be finalized. The wallet may not have approved yet, or the network hasn't settled. Try again.");
@@ -98,15 +94,6 @@ export default function OpenPaymentsCallback() {
     return () => { active = false; };
   }, [token, paymentId, interactRef]);
 
-  // The wallet redirected this tab back from the approval screen. Once the
-  // payment is confirmed there is nothing left to see here — close it so the
-  // contributor lands back on the bill page they started from.
-  useEffect(() => {
-    if (status !== "success" || !openedAsPopup) return;
-    const timer = setTimeout(() => window.close(), 1800);
-    return () => clearTimeout(timer);
-  }, [status, openedAsPopup]);
-
   if (status === "loading") {
     return (
       <div className="public-page">
@@ -115,10 +102,10 @@ export default function OpenPaymentsCallback() {
           <div className="secure-header-note"><Loader2 className="animate-spin-slow" size={15} /> Processing…</div>
         </header>
         <main className="min-h-screen flex flex-col items-center justify-center gap-4">
-          <Loader2 className="" size={40} />
+          <Loader2 className="animate-spin-slow" size={40} />
           <h2 style={{ color: "#161b2f" }}>Finalizing your payment…</h2>
           <p style={{ color: "#5b6478", maxWidth: 400, textAlign: "center" }}>
-            Your wallet approved the payment. We're waiting for the Interledger network to settle the funds. This usually takes 2–10 seconds.
+            Your wallet approved the payment. We&apos;re waiting for the Interledger network to settle the funds. This usually takes 2–10 seconds.
           </p>
         </main>
       </div>
@@ -154,14 +141,6 @@ export default function OpenPaymentsCallback() {
       </header>
       <main className="receipt-layout">
         <section className="receipt-card">
-          {openedAsPopup && (
-            <div style={{ marginBottom: 20, padding: 16, borderRadius: 14, background: "#ffe4d8", display: "flex", alignItems: "center", gap: 10 }}>
-              <Check size={18} color="#242f49" />
-              <span style={{ fontSize: ".84rem", color: "#161b2f", fontWeight: 600 }}>
-                Done — this window closes automatically.
-              </span>
-            </div>
-          )}
           <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#ffe4d8", display: "grid", placeItems: "center", marginBottom: 16 }}>
             <Check size={36} color="#242f49" strokeWidth={3} />
           </div>
