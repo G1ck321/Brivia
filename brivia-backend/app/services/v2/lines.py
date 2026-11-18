@@ -9,6 +9,7 @@ truth and lines are validated to sum to it.
 import secrets
 from datetime import datetime, timezone
 
+from app.config import schema
 from app.config.db import get_supabase
 
 
@@ -31,6 +32,10 @@ def _normalise(row: dict) -> dict:
 
 def get_lines(db, bill_id: str) -> list[dict]:
     """All lines for a bill, ordered, with derived remaining amounts."""
+    if not schema.has_table(db, "bill_lines"):
+        # Itemisation has not been migrated in; the bill is still valid, it just
+        # has no itemised view yet.
+        return []
     result = (
         db.table("bill_lines")
         .select("*")
@@ -77,6 +82,8 @@ def replace_lines(db, bill: dict, lines: list[dict]) -> list[dict]:
 
 
 def get_line(db, bill_id: str, line_id: str) -> dict | None:
+    if not schema.has_table(db, "bill_lines"):
+        return None
     result = (
         db.table("bill_lines")
         .select("*")
@@ -118,9 +125,15 @@ def allocate_for_payment(db, bill_id: str, line_id: str | None, net_minor: int) 
 
 def circle(db, bill_id: str, limit: int = 20) -> list[dict]:
     """Recent settled contributions, newest first, with their line label."""
+    # Selecting line_id on a pre-v2 database fails the whole query, which would
+    # take the care page down with it.
+    columns = "contributor_name, amount_minor, created_at, status"
+    if schema.payments_support_lines(db):
+        columns += ", line_id"
+
     result = (
         db.table("payments")
-        .select("contributor_name, amount_minor, created_at, line_id, status")
+        .select(columns)
         .eq("bill_id", bill_id)
         .eq("status", "COMPLETED")
         .order("created_at", desc=True)

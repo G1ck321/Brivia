@@ -15,6 +15,11 @@ from app.config.settings import get_settings
 
 _windows: dict[str, tuple[float, int]] = defaultdict(lambda: (0.0, 0))
 
+# Buckets that only read data — the care page polling and the live quote
+# preview while someone types. They share the high read ceiling so a demo
+# cannot 429 itself; writes keep the tighter PUBLIC_RATE_LIMIT_PER_MINUTE.
+_READ_BUCKETS = {"public-read", "v2-read"}
+
 
 def _client_key(request: Request) -> str:
     forwarded = request.headers.get("x-forwarded-for", "")
@@ -32,7 +37,12 @@ def public_rate_limit(bucket: str = "public"):
     """
 
     async def dependency(request: Request) -> None:
-        limit = get_settings().PUBLIC_RATE_LIMIT_PER_MINUTE
+        settings = get_settings()
+        limit = (
+            settings.PUBLIC_READ_RATE_LIMIT_PER_MINUTE
+            if bucket in _READ_BUCKETS
+            else settings.PUBLIC_RATE_LIMIT_PER_MINUTE
+        )
         if limit <= 0:
             return
 

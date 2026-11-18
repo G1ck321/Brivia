@@ -30,6 +30,10 @@ class Settings(BaseSettings):
 
     # --- Public endpoint protection ---
     PUBLIC_RATE_LIMIT_PER_MINUTE: int = 60  # 0 disables the limiter
+    # Reads (care page, circle poll, quote preview, receipt) are cheap and are
+    # what a live demo hammers. They get their own, much higher ceiling so
+    # polling every few seconds plus typing an amount cannot 429.
+    PUBLIC_READ_RATE_LIMIT_PER_MINUTE: int = 600
 
     # --- Open Payments ---
     # OP_SERVER_URL must be set in production (e.g. https://brivia-op-server.onrender.com)
@@ -44,6 +48,10 @@ class Settings(BaseSettings):
     # --- Reconciliation ---
     RECONCILER_ENABLED: bool = True
     RECONCILER_INTERVAL_SECONDS: int = 60
+    # Extra slack on top of OP_GRANT_TTL_MINUTES before an untouched payment is
+    # declared abandoned. A contributor can sit in their wallet for a while;
+    # failing the row while they are still approving would strand the transfer.
+    RECONCILER_PAYMENT_GRACE_MINUTES: int = 10
 
     # --- Telegram (optional; the product works without these) ---
     TELEGRAM_BOT_TOKEN: str = ""

@@ -5,9 +5,11 @@ Implements the payment abstraction layer from the spec.
 PaymentProvider → OpenPaymentsProvider → MockPaymentProvider (for MVP).
 """
 
+import logging
 import secrets
 from datetime import datetime, timezone
 
+from app.config import schema
 from app.config.db import get_supabase
 from app.config.settings import get_settings
 from app.schema.schemas import (
@@ -17,6 +19,8 @@ from app.schema.schemas import (
     BillStatus,
 )
 from app.services.ledger import apply_settlement, calculate_platform_fee
+
+logger = logging.getLogger(__name__)
 
 
 class PaymentProvider:
@@ -140,6 +144,18 @@ async def initiate_contribution(
     payment_id = str(secrets.token_hex(16))
     payment_ref = _generate_payment_reference()
 
+    # A pre-v2 database has no payments.line_id, and PostgREST rejects the whole
+    # insert over an unknown column even when the value is null — so the key is
+    # omitted entirely unless the column exists.
+    supports_lines = schema.payments_support_lines(db)
+    effective_line_id = line_id if supports_lines else None
+    if line_id and not supports_lines:
+        logger.warning(
+            "line_id %s requested but payments.line_id is missing; "
+            "run migrations/v2_care_circle.sql to record line claims",
+            line_id,
+        )
+
     payment_record = {
         "id": payment_id,
         "bill_id": bill_id,
@@ -151,10 +167,11 @@ async def initiate_contribution(
         "payment_reference": payment_ref,
         "external_payment_id": None,
         "idempotency_key": data.idempotency_key,
-        "line_id": line_id,
         "created_at": now,
         "updated_at": now,
     }
+    if supports_lines:
+        payment_record["line_id"] = effective_line_id
 
     db.table("payments").insert(payment_record).execute()
 
@@ -194,11 +211,11 @@ async def initiate_contribution(
             actor_id=contributor_id,
             currency=bill["currency"],
         )
-        if line_id:
+        if effective_line_id:
             # v2: credit the claimed line with the net amount.
             from app.services.v2.lines import allocate_for_payment
 
-            allocate_for_payment(db, bill_id, line_id, settlement["net_minor"])
+            allocate_for_payment(db, bill_id, effective_line_id, settlement["net_minor"])
 
     # Update payment status
     db.table("payments").update({

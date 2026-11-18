@@ -14,6 +14,7 @@ import hashlib
 import hmac
 from datetime import datetime, timezone
 
+from app.config import schema
 from app.config.settings import get_settings
 
 
@@ -40,6 +41,12 @@ def _digest(bill: dict) -> tuple[str, str]:
 
 def sign_bill(db, bill: dict) -> dict:
     """Sign (or re-sign) a bill. Provider-only, enforced by the router."""
+    if not schema.has_table(db, "bill_verifications"):
+        raise ValueError(
+            "Bill sealing needs the v2 migration. Run "
+            "brivia-backend/migrations/v2_care_circle.sql in the Supabase SQL editor."
+        )
+
     payload_hash, signature = _digest(bill)
     now = _now_iso()
 

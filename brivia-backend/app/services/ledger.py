@@ -64,17 +64,20 @@ def record_platform_fee(
     if fee_minor <= 0:
         return
 
-    existing = (
-        db.table("platform_fees")
-        .select("id")
-        .eq("payment_id", payment_id)
-        .limit(1)
-        .execute()
-    )
-    if existing.data:
-        return
-
     try:
+        # The lookup is inside the guard too: on a database without the
+        # platform_fees migration this select raises, and it used to take the
+        # whole settlement (and therefore the contribution) down with it.
+        existing = (
+            db.table("platform_fees")
+            .select("id")
+            .eq("payment_id", payment_id)
+            .limit(1)
+            .execute()
+        )
+        if existing.data:
+            return
+
         db.table("platform_fees").insert({
             "id": secrets.token_hex(16),
             "payment_id": payment_id,
@@ -104,6 +107,7 @@ def apply_settlement(
     bill: dict,
     payment_id: str,
     gross_amount_minor: int,
+    received_amount_minor: int | None = None,
     actor_id: str | None = None,
     currency: str | None = None,
 ) -> dict:
@@ -114,8 +118,13 @@ def apply_settlement(
     the callers (idempotency key for mock payments, an early COMPLETED return in
     the Open Payments callback).
     """
-    fee_minor = calculate_platform_fee(gross_amount_minor)
-    net_minor = gross_amount_minor - fee_minor
+    settled_minor = (
+        gross_amount_minor
+        if received_amount_minor is None
+        else max(0, int(received_amount_minor))
+    )
+    fee_minor = min(calculate_platform_fee(gross_amount_minor), settled_minor)
+    net_minor = max(settled_minor - fee_minor, 0)
 
     new_amount_paid = bill["amount_paid_minor"] + net_minor
     new_remaining = max(bill["remaining_balance_minor"] - net_minor, 0)

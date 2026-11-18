@@ -46,15 +46,20 @@ def status() -> dict:
 def queue(db, bill_id: str | None, body: str, target: str | None = None) -> str:
     """Persist a notification. Returns its id."""
     row_id = secrets.token_hex(16)
-    db.table("notification_outbox").insert({
-        "id": row_id,
-        "channel": "telegram",
-        "bill_id": bill_id,
-        "target": target,
-        "body": body[:3800],
-        "status": "queued",
-        "created_at": _now_iso(),
-    }).execute()
+    try:
+        db.table("notification_outbox").insert({
+            "id": row_id,
+            "channel": "telegram",
+            "bill_id": bill_id,
+            "target": target,
+            "body": body[:3800],
+            "status": "queued",
+            "created_at": _now_iso(),
+        }).execute()
+    except Exception:
+        # Outbox table not migrated in yet. A notification is never worth
+        # failing the contribution that triggered it.
+        pass
     return row_id
 
 

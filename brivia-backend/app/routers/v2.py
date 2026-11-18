@@ -40,7 +40,10 @@ from app.services.v2 import verify as verify_service
 
 router = APIRouter(prefix="/v2", tags=["Care Circle (v2)"])
 
-public_limit = public_rate_limit("v2-public")
+# Reads are polled every few seconds and re-quoted on every pause while
+# typing, so they use the generous read bucket. Claims stay tightly limited.
+read_limit = public_rate_limit("v2-read")
+claim_limit = public_rate_limit("v2-claim")
 
 
 # --- helpers ---------------------------------------------------------------
@@ -122,7 +125,10 @@ async def sign_bill(bill_id: str, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Only providers can seal a bill.")
     db = get_supabase()
     bill = _owned_bill(db, bill_id, user)
-    return verify_service.sign_bill(db, bill)
+    try:
+        return verify_service.sign_bill(db, bill)
+    except ValueError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
 
 
 @router.get("/bills/{bill_id}/verify", response_model=VerifyResponse)
@@ -164,7 +170,7 @@ async def reconciliation(
 @router.get(
     "/public/bills/{share_token}/care",
     response_model=CareResponse,
-    dependencies=[Depends(public_limit)],
+    dependencies=[Depends(read_limit)],
 )
 async def care_page(share_token: str):
     """Everything the contributor page needs in one request."""
@@ -198,7 +204,7 @@ async def care_page(share_token: str):
 @router.get(
     "/public/bills/{share_token}/circle",
     response_model=list[CircleEntry],
-    dependencies=[Depends(public_limit)],
+    dependencies=[Depends(read_limit)],
 )
 async def circle_feed(share_token: str):
     """Poll target for the live contributor strip."""
@@ -210,7 +216,7 @@ async def circle_feed(share_token: str):
 @router.get(
     "/public/bills/{share_token}/verify",
     response_model=VerifyResponse,
-    dependencies=[Depends(public_limit)],
+    dependencies=[Depends(read_limit)],
 )
 async def public_verify(share_token: str):
     """Anyone with the link can check the provider's seal."""
@@ -224,7 +230,7 @@ async def public_verify(share_token: str):
 @router.post(
     "/public/bills/{share_token}/quote",
     response_model=QuoteResponse,
-    dependencies=[Depends(public_limit)],
+    dependencies=[Depends(read_limit)],
 )
 async def quote_preview(share_token: str, data: QuoteRequest):
     """Preview what the bill receives for an amount in the contributor's currency."""
@@ -256,7 +262,7 @@ async def currencies():
 @router.post(
     "/public/bills/{share_token}/claim",
     response_model=ClaimResponse,
-    dependencies=[Depends(public_limit)],
+    dependencies=[Depends(claim_limit)],
 )
 async def claim(share_token: str, data: ClaimRequest):
     """
@@ -332,7 +338,7 @@ async def claim(share_token: str, data: ClaimRequest):
 @router.get(
     "/public/receipts/{reference}",
     response_model=ReceiptResponse,
-    dependencies=[Depends(public_limit)],
+    dependencies=[Depends(read_limit)],
 )
 async def receipt(reference: str):
     """Shareable receipt, no login required."""
@@ -347,7 +353,7 @@ async def receipt(reference: str):
 
 @router.post(
     "/public/bills/{share_token}/telegram",
-    dependencies=[Depends(public_limit)],
+    dependencies=[Depends(claim_limit)],
 )
 async def subscribe_telegram(share_token: str, data: TelegramSubscribeRequest):
     """

@@ -103,6 +103,47 @@ def load_grant(db, payment_id: str) -> dict | None:
     return None
 
 
+def live_grant_ids(db) -> set[str]:
+    """
+    Payment ids whose grant can still be continued (unexpired, unconsumed).
+
+    The reconciler uses this as a veto: a payment is never failed while its
+    grant is live, because the contributor may still be approving it in their
+    wallet. Falls back to the ``audit_logs`` store, which has no explicit
+    expiry, so the TTL is derived from ``created_at``.
+    """
+    try:
+        result = (
+            db.table("op_grants")
+            .select("payment_id, expires_at, consumed_at")
+            .gte("expires_at", _now().isoformat())
+            .is_("consumed_at", "null")
+            .execute()
+        )
+        return {row["payment_id"] for row in (result.data or []) if row.get("payment_id")}
+    except Exception:
+        pass
+
+    try:
+        cutoff = (
+            _now() - timedelta(minutes=get_settings().OP_GRANT_TTL_MINUTES)
+        ).isoformat()
+        result = (
+            db.table("audit_logs")
+            .select("resource_id")
+            .eq("action", "OPEN_PAYMENTS_INITIATED")
+            .gte("created_at", cutoff)
+            .execute()
+        )
+        return {
+            row["resource_id"]
+            for row in (result.data or [])
+            if row.get("resource_id")
+        }
+    except Exception:
+        return set()
+
+
 def consume_grant(db, payment_id: str) -> None:
     """Mark a grant as used so a replay cannot finalise it twice."""
     try:

@@ -249,8 +249,12 @@ async def get_public_bill_by_token(share_token: str) -> tuple[PublicBillResponse
     provider_result = (
         db.table("users").select("name, facility_name").eq("id", bill["provider_id"]).limit(1).execute()
     )
-    provider_name = provider_result.data[0]["name"] if provider_result.data else "Unknown"
-    facility_name = provider_result.data[0].get("facility_name", "Unknown") if provider_result.data else "Unknown"
+    # facility_name is nullable, and a provider can register without one. Passing
+    # None into PublicBillResponse (which requires a string) used to 500 the
+    # whole care page and every quote for that bill.
+    provider = provider_result.data[0] if provider_result.data else {}
+    provider_name = (provider.get("name") or "Unknown").strip() or "Unknown"
+    facility_name = (provider.get("facility_name") or "").strip() or provider_name
 
     return PublicBillResponse(
         public_bill_id=bill["public_bill_id"],
