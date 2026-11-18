@@ -90,7 +90,7 @@ console.log("Waiting for approval... (press Ctrl+C if browser doesn't open)\n");
 // --- Step 5: Wait for user to approve, then finalize ---
 // Poll the continue URI until grant is finalized
 let finalizedGrant = null;
-for (let i = 0; i < 120; i++) {  // 2 minutes max
+for (let i = 0; i < 180; i++) {  // 2 minutes max
   await new Promise(r => setTimeout(r, 1000));
   try {
     const result = await client.grant.continue({
@@ -131,7 +131,7 @@ console.log(`   Receive: ${outgoingPayment.receiveAmount.value} ${outgoingPaymen
 // --- Step 7: Poll for settlement ---
 console.log("⏳ Waiting for settlement...\n");
 
-for (let i = 0; i < 30; i++) {
+for (let i = 0; i < 120; i++) {
   await new Promise(r => setTimeout(r, 2000));
   try {
     const updated = await client.incomingPayment.get({
