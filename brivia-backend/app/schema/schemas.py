@@ -76,6 +76,7 @@ class BillResponse(BaseModel):
     id: str
     public_bill_id: str
     provider_id: str
+    patient_id: str | None = None
     patient_name: str
     description: str
     amount_minor: int

@@ -20,6 +20,7 @@ import {
   Sparkles,
   UsersRound,
   Wallet,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -34,11 +35,25 @@ import {
 
 const markUrl = "/logomark.png";
 
-const navItems = [
+interface NavItem {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+  scrollId?: string;
+}
+
+// Providers manage bills; patients only see their own care ledger.
+const providerNavItems: NavItem[] = [
   { label: "Overview", href: "/", icon: LayoutDashboard },
   { label: "Create bill", href: "/provider/create", icon: ClipboardPlus },
   { label: "Patient view", href: "/patient", icon: UsersRound },
   { label: "Care ledger", href: "/provider/create", icon: FileText, scrollId: "bills-section" },
+];
+
+const patientNavItems: NavItem[] = [
+  { label: "Overview", href: "/", icon: LayoutDashboard },
+  { label: "My bills", href: "/patient", icon: FileText },
+  { label: "My care ledger", href: "/patient", icon: HeartHandshake, scrollId: "bills-section" },
 ];
 
 function Tooltip({ children, text }: { children: ReactNode; text: string }) {
@@ -270,6 +285,9 @@ export function BriviaAppShell({ children }: { children: ReactNode }) {
     getMe().then(setUser).catch(() => {});
   }, []);
 
+  const isProvider = user?.role === "provider";
+  const navItems = isProvider ? providerNavItems : patientNavItems;
+
   const scrollToLedger = () => {
     const el = document.getElementById("bills-section");
     if (!el) return false;
@@ -289,7 +307,7 @@ export function BriviaAppShell({ children }: { children: ReactNode }) {
     }, 100);
   };
 
-  const handleNavClick = (event: ReactMouseEvent, item: (typeof navItems)[number]) => {
+  const handleNavClick = (event: ReactMouseEvent, item: NavItem) => {
     if (!item.scrollId) return;
     event.preventDefault();
     goToLedger();
@@ -369,22 +387,44 @@ export function BriviaAppShell({ children }: { children: ReactNode }) {
           <LayoutDashboard size={19} />
           <span>Home</span>
         </Link>
-        <Link
-          href="/provider/create"
-          className="mobile-nav-item"
-          onClick={(event) => handleNavClick(event, navItems[3])}
-        >
-          <FileText size={19} />
-          <span>Ledger</span>
-        </Link>
-        <Link href="/provider/create" className={cn("mobile-nav-item create", pathname === "/provider/create" && "active")}>
-          <ClipboardPlus size={19} />
-          <span>Bill</span>
-        </Link>
-        <Link href="/patient" className={cn("mobile-nav-item", pathname === "/patient" && "active")}>
-          <HeartHandshake size={19} />
-          <span>Share</span>
-        </Link>
+        {isProvider ? (
+          <>
+            <Link
+              href="/provider/create"
+              className="mobile-nav-item"
+              onClick={(event) => handleNavClick(event, providerNavItems[3])}
+            >
+              <FileText size={19} />
+              <span>Ledger</span>
+            </Link>
+            <Link
+              href="/provider/create"
+              className={cn("mobile-nav-item create", pathname === "/provider/create" && "active")}
+            >
+              <ClipboardPlus size={19} />
+              <span>Bill</span>
+            </Link>
+            <Link href="/patient" className={cn("mobile-nav-item", pathname === "/patient" && "active")}>
+              <HeartHandshake size={19} />
+              <span>Share</span>
+            </Link>
+          </>
+        ) : (
+          <>
+            <Link
+              href="/patient"
+              className={cn("mobile-nav-item", pathname === "/patient" && "active")}
+              onClick={(event) => handleNavClick(event, patientNavItems[2])}
+            >
+              <FileText size={19} />
+              <span>My bills</span>
+            </Link>
+            <Link href="/patient" className={cn("mobile-nav-item", pathname === "/patient" && "active")}>
+              <HeartHandshake size={19} />
+              <span>Share</span>
+            </Link>
+          </>
+        )}
       </nav>
     </div>
   );

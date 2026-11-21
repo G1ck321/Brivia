@@ -46,6 +46,7 @@ def _bill_row_to_response(row: dict) -> BillResponse:
         id=row["id"],
         public_bill_id=row["public_bill_id"],
         provider_id=row["provider_id"],
+        patient_id=row.get("patient_id"),
         patient_name=row["patient_name"],
         description=row["description"],
         amount_minor=row["amount_minor"],
@@ -72,7 +73,11 @@ async def create_bill(provider_id: str, data: BillCreate) -> BillResponse:
     patient_id = None
     if data.patient_email:
         patient_result = (
-            db.table("users").select("id").eq("email", str(data.patient_email).lower()).limit(1).execute()
+            db.table("users")
+            .select("id")
+            .ilike("email", str(data.patient_email).strip().lower())
+            .limit(1)
+            .execute()
         )
         if patient_result.data:
             patient_id = patient_result.data[0]["id"]
@@ -146,11 +151,45 @@ async def get_bills_for_patient(patient_id: str, patient_name: str) -> list[Bill
             .execute()
         )
         for row in result.data:
+            # A name is not an identity: only fall back to it for legacy bills
+            # that have no patient_id yet. A bill explicitly linked to someone
+            # else must never surface because two patients share a name.
+            linked = row.get("patient_id")
+            if column == "patient_name" and linked and linked != patient_id:
+                continue
             bills_by_id[row["id"]] = row
 
     # Both queries are already sorted desc; merge them back into one list.
     merged = sorted(bills_by_id.values(), key=lambda row: row.get("created_at") or "", reverse=True)
     return [_bill_row_to_response(row) for row in merged]
+
+
+def can_access_bill(bill, user: dict) -> bool:
+    """Whether ``user`` may read this bill and its payment history.
+
+    Accepts a ``BillResponse`` or a raw database row. Providers see their own
+    bills; a patient sees bills linked to their account, plus legacy bills that
+    only carry their name and were never linked. Everyone else is refused.
+    """
+
+    def field(name: str):
+        return bill.get(name) if isinstance(bill, dict) else getattr(bill, name, None)
+
+    if user.get("role") == "admin":
+        return True
+    if field("provider_id") == user.get("id"):
+        return True
+    if user.get("role") != "patient":
+        return False
+
+    linked = field("patient_id")
+    if linked == user.get("id"):
+        return True
+
+    name_match = (field("patient_name") or "").strip().casefold() == (
+        user.get("name") or ""
+    ).strip().casefold()
+    return linked is None and bool(name_match)
 
 
 async def get_bill_by_id(bill_id: str) -> BillResponse | None:

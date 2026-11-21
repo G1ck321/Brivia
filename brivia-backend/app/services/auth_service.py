@@ -23,8 +23,14 @@ async def register_user(data: UserRegister) -> TokenResponse:
     db = get_supabase()
     settings = get_settings()
 
-    # Check for existing email
-    existing = db.table("users").select("id").eq("email", data.email).execute()
+    # Emails are stored lowercase so a bill created with "Patient@X.com" still
+    # links to the account registered as "patient@x.com".
+    email = str(data.email).strip().lower()
+
+    # Check for existing email (case-insensitive for legacy mixed-case rows)
+    existing = db.table("users").select("id").eq("email", email).limit(1).execute()
+    if not existing.data:
+        existing = db.table("users").select("id").ilike("email", email).limit(1).execute()
     if existing.data:
         raise ValueError("An account with this email already exists.")
 
@@ -33,7 +39,7 @@ async def register_user(data: UserRegister) -> TokenResponse:
 
     user_record = {
         "id": user_id,
-        "email": data.email,
+        "email": email,
         "name": data.name,
         "password_hash": hash_password(data.password),
         "role": data.role.value,
@@ -48,7 +54,7 @@ async def register_user(data: UserRegister) -> TokenResponse:
 
     user_resp = UserResponse(
         id=user_id,
-        email=data.email,
+        email=email,
         name=data.name,
         role=data.role,
         facility_name=data.facility_name,
@@ -62,7 +68,11 @@ async def login_user(data: UserLogin) -> TokenResponse:
     """Authenticate and return a JWT."""
     db = get_supabase()
 
-    result = db.table("users").select("*").eq("email", data.email).limit(1).execute()
+    email = str(data.email).strip()
+    result = db.table("users").select("*").eq("email", email).limit(1).execute()
+    if not result.data:
+        # Tolerate legacy rows stored with different casing.
+        result = db.table("users").select("*").ilike("email", email).limit(1).execute()
     if not result.data:
         raise ValueError("Invalid email or password.")
 

@@ -13,6 +13,7 @@ from app.services.bill_service import (
     get_bills_for_patient,
     create_share_link,
     revoke_share_links,
+    can_access_bill,
 )
 
 router = APIRouter(prefix="/bills", tags=["Bills"])
@@ -48,6 +49,11 @@ async def get_bill(bill_id: str, user: dict = Depends(get_current_user)):
     bill = await get_bill_by_id(bill_id)
     if not bill:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found.")
+    if not can_access_bill(bill, user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You cannot view this bill.",
+        )
     return bill
 
 
@@ -57,10 +63,12 @@ async def share_bill(bill_id: str, user: dict = Depends(get_current_user)):
     bill = await get_bill_by_id(bill_id)
     if not bill:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found.")
-    if bill.provider_id != user["id"] and user["role"] != "admin":
+    # The linked patient must be able to share their own bill: that is the
+    # patient dashboard's primary action. Unrelated users still cannot.
+    if not can_access_bill(bill, user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only share bills you created.",
+            detail="You cannot share this bill.",
         )
     return await create_share_link(bill_id)
 

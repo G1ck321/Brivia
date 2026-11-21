@@ -8,6 +8,8 @@ from app.routers.auth import get_current_user
 from pydantic import BaseModel
 
 from app.schema.schemas import PaymentCreate, PaymentResponse
+from app.services.bill_service import can_access_bill
+from app.config.db import get_supabase
 from app.services.payment_service import (
     initiate_contribution,
     get_payments_for_bill,
@@ -60,6 +62,17 @@ async def list_bill_payments(
     user: dict = Depends(get_current_user),
 ):
     """List all payments for a specific bill."""
+    db = get_supabase()
+    bill_result = db.table("bills").select("*").eq("id", bill_id).limit(1).execute()
+    if not bill_result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found."
+        )
+    if not can_access_bill(bill_result.data[0], user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You cannot view this bill's payments.",
+        )
     return await get_payments_for_bill(bill_id)
 
 

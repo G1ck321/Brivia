@@ -30,6 +30,7 @@ from app.schema.v2_schemas import (
     VerifyResponse,
 )
 from app.services.bill_service import get_public_bill_by_token
+from app.services.bill_service import can_access_bill
 from app.services.payment_service import initiate_contribution
 from app.services.ratelimit import public_rate_limit
 from app.services.v2 import lines as lines_service
@@ -106,12 +107,7 @@ async def list_lines(bill_id: str, user: dict = Depends(get_current_user)):
     """Lines for a bill the caller is allowed to see."""
     db = get_supabase()
     bill = _bill_row(db, bill_id)
-    visible = (
-        bill["provider_id"] == user["id"]
-        or bill.get("patient_id") == user["id"]
-        or bill.get("patient_name") == user.get("name")
-    )
-    if not visible:
+    if not can_access_bill(bill, user):
         raise HTTPException(status_code=403, detail="You cannot view this bill.")
     return lines_service.get_lines(db, bill["id"])
 

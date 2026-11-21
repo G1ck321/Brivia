@@ -23,6 +23,7 @@ import { BriviaAppShell } from "@/components/BriviaAppShell";
 import {
   getBill,
   getBillPayments,
+  getMe,
   shareBill,
   type Bill,
   type Payment,
@@ -73,6 +74,13 @@ export default function BillDetailPage() {
   const [loading, setLoading] = useState(true);
   const [shareUrl, setShareUrl] = useState("");
   const [copied, setCopied] = useState(false);
+  const [isProvider, setIsProvider] = useState(false);
+
+  useEffect(() => {
+    getMe()
+      .then((me) => setIsProvider(me.role === "provider"))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -197,9 +205,11 @@ export default function BillDetailPage() {
                 <h3 style={{ fontSize: "1rem", fontWeight: 800, letterSpacing: "-.04em" }}>Payment history</h3>
                 <p style={{ fontSize: ".76rem", color: "#7b8398", marginTop: 2 }}>{payments.length} contribution{payments.length !== 1 ? "s" : ""}</p>
               </div>
-              <Link href={`/provider/bills/${bill.id}`} className="outline-button" style={{ padding: "6px 14px", fontSize: ".76rem", minHeight: "auto" }}>
-                Bill studio <ExternalLink size={14} />
-              </Link>
+              {isProvider && (
+                <Link href={`/provider/bills/${bill.id}`} className="outline-button" style={{ padding: "6px 14px", fontSize: ".76rem", minHeight: "auto" }}>
+                  Bill studio <ExternalLink size={14} />
+                </Link>
+              )}
               {shareUrl && (
                 <Link href={`/pay/${shareUrl.split("/pay/")[1] || ""}`} className="outline-button" style={{ padding: "6px 14px", fontSize: ".76rem", minHeight: "auto" }}>
                   Make a payment <ExternalLink size={14} />

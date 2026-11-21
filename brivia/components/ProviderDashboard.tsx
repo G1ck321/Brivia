@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { BriviaAppShell } from "@/components/BriviaAppShell";
 import {
   createBill,
+  getMe,
   getMyBills,
   shareBill,
   type Bill,
@@ -74,6 +75,15 @@ export default function ProviderDashboard() {
   const [description, setDescription] = useState("Outpatient treatment support");
   const [amount, setAmount] = useState("");
   const [dueDate, setDueDate] = useState(defaultDueDate);
+
+  useEffect(() => {
+    // This workspace is provider-only; a signed-in patient belongs on /patient.
+    getMe()
+      .then((me) => {
+        if (me.role !== "provider") router.replace("/patient");
+      })
+      .catch(() => {});
+  }, [router]);
 
   useEffect(() => {
     loadBills();
