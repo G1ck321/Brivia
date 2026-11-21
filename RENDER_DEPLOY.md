@@ -138,7 +138,7 @@ Only needed if you want real ILP transfers in production.
 
 ```
 OP_WALLET_ADDRESS_URL=https://ilp.interledger-test.dev/practice
-OP_KEY_ID=7081bbed-1e3e-416d-b4b5-981b3993be68
+OP_KEY_ID=4ff04aca-5ed2-4514-930f-645a2663ed50
 OP_PRIVATE_KEY=<paste your full private key here>
 NODE_VERSION=20
 ```

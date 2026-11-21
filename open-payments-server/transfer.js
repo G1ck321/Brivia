@@ -90,9 +90,9 @@ const KEY_ID = "7081bbed-1e3e-416d-b4b5-981b3993be68";    // Your API key ID
 // RECEIVER = The wallet that receives payment. An incoming payment is
 //            created on this wallet to accept the funds.
 
-const CLIENT_WALLET   = "https://ilp.interledger-test.dev/practice";
+const CLIENT_WALLET   = "https://ilp.interledger-test.dev/briviacare";
 const SENDER_WALLET   = "https://ilp.interledger-test.dev/euroanna";
-const RECEIVER_WALLET = "https://ilp.interledger-test.dev/practice";
+const RECEIVER_WALLET = "https://ilp.interledger-test.dev/briviacare";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SECTION 4: CLI ARGUMENTS
@@ -115,7 +115,7 @@ const description = process.argv[3] || "Brivia payment";  // Payment description
 //   3. Can make authenticated requests on behalf of CLIENT_WALLET
 //
 // WHAT HAPPENS UNDER THE HOOD:
-//   - SDK fetches https://ilp.interledger-test.dev/practice (the wallet)
+//   - SDK fetches https://ilp.interledger-test.dev/briviacare (the wallet)
 //   - From the wallet, it gets the authServer URL
 //   - It fetches the OpenAPI spec from the auth server
 //   - It registers your key as a "client" with that auth server

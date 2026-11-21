@@ -23,7 +23,7 @@ const KEY_ID = "7081bbed-1e3e-416d-b4b5-981b3993be68";
 
 const CLIENT_WALLET = "https://ilp.interledger-test.dev/euroanna";  // your wallet (client identity)
 const SENDER_WALLET = "https://ilp.interledger-test.dev/euroanna";  // sender (pays)
-const RECEIVER_WALLET = "https://ilp.interledger-test.dev/practice"; // receiver (gets paid)
+const RECEIVER_WALLET = "https://ilp.interledger-test.dev/briviacare"; // receiver (gets paid)
 
 // --- Parse args ---
 const amount = parseInt(process.argv[2] || "1000");

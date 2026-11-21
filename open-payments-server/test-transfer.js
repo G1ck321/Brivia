@@ -1,5 +1,5 @@
 /**
- * Brivia test: euroanna → practice (different wallets, same currency EUR)
+ * Brivia test: euroanna → brivia (different wallets, same currency EUR)
  * 
  * Usage: node test-transfer.js [amount]
  */
@@ -17,11 +17,11 @@ const CLIENT_WALLET = "https://ilp.interledger-test.dev/euroanna";
 // Sender pays
 const SENDER_WALLET = "https://ilp.interledger-test.dev/euroanna";
 // Receiver gets paid
-const RECEIVER_WALLET = "https://ilp.interledger-test.dev/practice";
+const RECEIVER_WALLET = "https://ilp.interledger-test.dev/briviacare";
 
 const amount = parseInt(process.argv[2] || "100");
 
-console.log(`\n🧪 Test: ${amount} EUR from euroanna → practice\n`);
+console.log(`\n🧪 Test: ${amount} EUR from euroanna → brivia\n`);
 
 const client = await createAuthenticatedClient({
   walletAddressUrl: CLIENT_WALLET,
@@ -119,4 +119,4 @@ for (let i = 0; i < 30; i++) {
 }
 console.log("\n\n⚠️  Still pending after 60s.");
 console.log("This means the ILP connector hasn't routed the payment yet.");
-console.log("Check: https://ilp.interledger-test.dev/practice for balance.");
+console.log("Check: https://ilp.interledger-test.dev/brivia for balance.");

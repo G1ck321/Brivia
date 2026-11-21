@@ -24,8 +24,19 @@ export default function OpenPaymentsCallback() {
   // Interaction reference appended by the authorization server to the finish
   // redirect. Required to continue the grant.
   const interactRef = searchParams.get("interact_ref") ?? "";
+  // When the contributor declines in their wallet the authorization server
+  // sends them back with GNAP error parameters (error / error_description).
+  // Nothing was charged, so there is nothing to finalize.
+  const walletError = searchParams.get("error") ?? "";
+  const walletErrorDescription = searchParams.get("error_description") ?? "";
+  // The Interledger authorization server does not use GNAP's `error` parameter
+  // for a refusal: it appends `result=grant_rejected` (or `grant_invalid` when
+  // the grant could no longer be decided) and sends the contributor back here
+  // with no interact_ref. Without this the page assumes the approval is still
+  // in flight, polls the finalize endpoint, and ends on "could not be confirmed".
+  const walletResult = searchParams.get("result") ?? "";
 
-  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "success" | "error" | "declined">("loading");
   const [payment, setPayment] = useState<Payment | null>(null);
   const [billStatus, setBillStatus] = useState("");
   const [receivedAmount, setReceivedAmount] = useState(0);
@@ -34,6 +45,34 @@ export default function OpenPaymentsCallback() {
   const [netAmount, setNetAmount] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
   useEffect(() => {
+    const declineMessage = walletError
+      ? walletErrorDescription || "Your wallet declined this payment. Nothing was charged."
+      : walletResult === "grant_rejected"
+        ? "Your wallet declined this payment. Nothing was charged."
+        : walletResult === "grant_invalid"
+          ? "That approval is no longer valid — it may have expired or already been used. Nothing was charged."
+          : walletResult
+            ? "This payment was not approved. Nothing was charged."
+            : "";
+
+    if (declineMessage) {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("brivia_op_payment_id");
+        localStorage.removeItem("brivia_op_payment_at");
+        localStorage.removeItem("brivia_op_share_token");
+        const parent = window.opener;
+        if (parent && !parent.closed) {
+          parent.postMessage(
+            { type: "brivia:payment-declined", token },
+            window.location.origin
+          );
+        }
+      }
+      setStatus("declined");
+      setErrorMessage(declineMessage);
+      return;
+    }
+
     // Get payment_id from URL or localStorage
     const effectivePaymentId = paymentId ||
       (typeof window !== "undefined" ? localStorage.getItem("brivia_op_payment_id") : "") || "";
@@ -66,6 +105,7 @@ export default function OpenPaymentsCallback() {
         setStatus("success");
         // Clean up localStorage
         localStorage.removeItem("brivia_op_payment_id");
+        localStorage.removeItem("brivia_op_payment_at");
         localStorage.removeItem("brivia_op_share_token");
 
         // If the wallet redirected this tab back, hand the result over to the
@@ -92,7 +132,7 @@ export default function OpenPaymentsCallback() {
     setTimeout(poll, 1500);
 
     return () => { active = false; };
-  }, [token, paymentId, interactRef]);
+  }, [token, paymentId, interactRef, walletError, walletErrorDescription, walletResult]);
 
   if (status === "loading") {
     return (
@@ -107,6 +147,26 @@ export default function OpenPaymentsCallback() {
           <p style={{ color: "#5b6478", maxWidth: 400, textAlign: "center" }}>
             Your wallet approved the payment. We&apos;re waiting for the Interledger network to settle the funds. This usually takes 2–10 seconds.
           </p>
+        </main>
+      </div>
+    );
+  }
+
+  if (status === "declined") {
+    return (
+      <div className="public-page">
+        <header className="public-header">
+          <Link href="/" className="public-brand"><BriviaMark /></Link>
+          <div className="secure-header-note"><XCircle size={15} /> Payment declined</div>
+        </header>
+        <main className="min-h-screen flex flex-col items-center justify-center gap-4">
+          <div className="receipt-success-mark muted"><XCircle size={29} /></div>
+          <h2 style={{ color: "#161b2f" }}>Payment declined</h2>
+          <p style={{ color: "#5b6478", maxWidth: 400, textAlign: "center" }}>{errorMessage}</p>
+          <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
+            <Link href={`/pay/${token}`} className="primary-button">Try again</Link>
+            <Link href="/" className="outline-button">Back to Brivia</Link>
+          </div>
         </main>
       </div>
     );

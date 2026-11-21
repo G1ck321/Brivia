@@ -15,6 +15,20 @@ from app.config.settings import get_settings
 logger = logging.getLogger(__name__)
 
 
+class WalletPaymentError(Exception):
+    """
+    A wallet-network failure with a message safe to show a contributor.
+
+    ``status_code`` is what the API should answer with: 4xx when the address
+    looks wrong, 5xx when the wallet network itself is unavailable.
+    """
+
+    def __init__(self, message: str, status_code: int = 502):
+        super().__init__(message)
+        self.message = message
+        self.status_code = status_code
+
+
 def get_op_server_url() -> str:
     """Get the Open Payments server URL.
     
@@ -80,6 +94,151 @@ async def setup_incoming_payment(
         "amount_minor": amount_minor,
         "reference": reference,
     })
+
+
+async def get_wallet_asset(wallet_address_url: str) -> dict:
+    """Resolve a wallet's asset code and scale.
+
+    Needed before a payment: the bill is priced in its own currency, but the
+    contributor's wallet only quotes and debits its own asset.
+
+    Returns:
+        {"wallet_address": "...", "asset_code": "EUR", "asset_scale": 2}
+    """
+    return await _post("/wallet-info", {"wallet_address_url": wallet_address_url})
+
+
+def _extract_failure_reason(payload) -> str:
+    """Pull a readable reason out of the Open Payments server's error body."""
+    if not isinstance(payload, dict):
+        return ""
+
+    parts: list[str] = []
+    for key in ("error", "message", "detail"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            parts.append(value.strip())
+        elif isinstance(value, dict):
+            for inner in ("description", "message", "error"):
+                text = value.get(inner)
+                if isinstance(text, str) and text.strip():
+                    parts.append(text.strip())
+    return " | ".join(parts)
+
+
+def wallet_failure_message(reason: str) -> str:
+    """Map a wallet/network failure onto advice the contributor can act on."""
+    text = (reason or "").lower()
+
+    if any(
+        marker in text
+        for marker in (
+            "fetch failed",
+            "enotfound",
+            "econnrefused",
+            "econnreset",
+            "getaddrinfo",
+            "network",
+            "timed out",
+            "timeout",
+            "socket hang up",
+        )
+    ):
+        return (
+            "We couldn't reach a wallet at that address. Check the link is correct "
+            "and that your wallet is online, then try again."
+        )
+
+    if any(marker in text for marker in ("404", "not found", "no such", "unknown wallet")):
+        return (
+            "No Open Payments wallet was found at that address. Use the wallet "
+            "address shown in your wallet app, for example "
+            "https://ilp.interledger-test.dev/your-wallet."
+        )
+
+    if "non-positive receive amount" in text or "amount too small" in text or "minimum" in text:
+        return (
+            "That contribution is too small for the wallet network to settle. "
+            "Try a larger amount."
+        )
+
+    if "invalid_interaction" in text or "interaction" in text:
+        return (
+            "Your wallet didn't confirm the approval. Please start the payment "
+            "again from your wallet."
+        )
+
+    return (
+        "Your wallet couldn't start this payment. Check the wallet address is "
+        "correct and that the wallet supports Open Payments, then try again."
+    )
+
+
+async def request_outgoing_grant(
+    sender_wallet_url: str,
+    incoming_payment_url: str,
+    amount_minor: int,
+    callback_url: str,
+) -> dict:
+    """
+    Ask the Open Payments server for an outgoing-payment grant.
+
+    Every failure mode (unreachable service, malformed address, wallet error)
+    becomes a :class:`WalletPaymentError` with a contributor-safe message, so
+    the API never echoes raw httpx/Node errors as a 500.
+    """
+    url = f"{get_op_server_url()}/initiate-outgoing"
+    payload = {
+        "sender_wallet_url": sender_wallet_url,
+        "incoming_payment_url": incoming_payment_url,
+        "amount_minor": amount_minor,
+        "callback_url": callback_url,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(url, json=payload)
+    except httpx.TimeoutException:
+        logger.warning("Open Payments server timed out at %s", url)
+        raise WalletPaymentError(
+            "The wallet network took too long to respond. Please try again.", 504
+        )
+    except httpx.HTTPError as exc:
+        logger.warning("Open Payments server unreachable at %s: %s", url, exc)
+        raise WalletPaymentError(
+            "We couldn't reach the payment service. Please try again in a moment.", 503
+        )
+
+    if resp.status_code >= 400:
+        try:
+            reason = _extract_failure_reason(resp.json())
+        except ValueError:
+            reason = ""
+        logger.warning(
+            "initiate-outgoing failed (%s): %s", resp.status_code, reason or resp.text[:300]
+        )
+        raise WalletPaymentError(
+            wallet_failure_message(reason),
+            400 if resp.status_code < 500 else 502,
+        )
+
+    try:
+        result = resp.json()
+    except ValueError:
+        logger.warning("initiate-outgoing returned non-JSON: %s", resp.text[:300])
+        raise WalletPaymentError(
+            "The payment service returned an unreadable response. Please try again.", 502
+        )
+
+    if not result.get("interact_redirect") or not result.get("continue_uri"):
+        logger.warning("initiate-outgoing returned no approval link: %s", result)
+        raise WalletPaymentError(
+            "Your wallet didn't return an approval link. Check the wallet address "
+            "and try again.",
+            502,
+        )
+
+    return result
 
 
 async def initiate_outgoing_payment(

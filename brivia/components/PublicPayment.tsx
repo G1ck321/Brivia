@@ -18,7 +18,36 @@ import {
   Loader2,
 } from "lucide-react";
 import { BriviaMark } from "@/components/BriviaAppShell";
-import { getPublicBill, contributeToBill, initiateOpenPayments, type PublicBill, type Payment } from "@/lib/api";
+import { ApiError, getOpenPaymentsCallback, getPublicBill, contributeToBill, initiateOpenPayments, type PublicBill, type Payment } from "@/lib/api";
+
+// A wallet approval only lives as long as the GNAP grant behind it, so a
+// "payment waiting" prompt restored from storage must expire with it. Without
+// this the prompt follows the contributor around long after the wallet
+// rejected or abandoned the payment.
+const PENDING_PAYMENT_KEY = "brivia_op_payment_id";
+const PENDING_PAYMENT_AT_KEY = "brivia_op_payment_at";
+const PENDING_PAYMENT_TTL_MS = 15 * 60 * 1000;
+
+function readPendingPayment(): string {
+  if (typeof window === "undefined") return "";
+  const paymentId = localStorage.getItem(PENDING_PAYMENT_KEY);
+  if (!paymentId) return "";
+  const startedAt = Number(localStorage.getItem(PENDING_PAYMENT_AT_KEY) || 0);
+  if (!startedAt || Date.now() - startedAt > PENDING_PAYMENT_TTL_MS) {
+    localStorage.removeItem(PENDING_PAYMENT_KEY);
+    localStorage.removeItem(PENDING_PAYMENT_AT_KEY);
+    localStorage.removeItem("brivia_op_share_token");
+    return "";
+  }
+  return paymentId;
+}
+
+function clearPendingPayment(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(PENDING_PAYMENT_KEY);
+  localStorage.removeItem(PENDING_PAYMENT_AT_KEY);
+  localStorage.removeItem("brivia_op_share_token");
+}
 
 function formatMoney(minor: number): string {
   return `₦${(minor / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`;
@@ -51,9 +80,7 @@ export default function PublicPayment() {
   // An Open Payments grant is awaiting wallet approval. Seeded from
   // localStorage on first render so the prompt survives a reload — the
   // contributor may be away in their wallet for a while.
-  const [hasPendingPayment, setHasPendingPayment] = useState(
-    () => typeof window !== "undefined" && !!localStorage.getItem("brivia_op_payment_id")
-  );
+  const [hasPendingPayment, setHasPendingPayment] = useState(() => !!readPendingPayment());
   const idempotencyKey = useRef(`idem-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
   useEffect(() => {
@@ -63,16 +90,49 @@ export default function PublicPayment() {
     function onMessage(event: MessageEvent) {
       if (event.origin !== window.location.origin) return;
       const data = event.data as { type?: string; token?: string } | null;
-      if (data?.type !== "brivia:payment-complete" || data.token !== token) return;
+      if (data?.token !== token) return;
+      if (data.type === "brivia:payment-declined") {
+        // Declined in the wallet: drop the "payment waiting" prompt.
+        setHasPendingPayment(false);
+        clearPendingPayment();
+        return;
+      }
+      if (data.type !== "brivia:payment-complete") return;
       setHasPendingPayment(false);
-      localStorage.removeItem("brivia_op_payment_id");
-      localStorage.removeItem("brivia_op_share_token");
+      clearPendingPayment();
       getPublicBill(token).then(setBill).catch(() => {});
     }
 
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, [token]);
+
+  // A prompt restored from storage may be stale — declined, abandoned, or
+  // already settled in another tab. Ask the backend: only "still awaiting
+  // authorization" (409) keeps the prompt on screen.
+  useEffect(() => {
+    if (!token || !hasPendingPayment) return;
+    const pendingId = readPendingPayment();
+    if (!pendingId) {
+      setHasPendingPayment(false);
+      return;
+    }
+    let active = true;
+    getOpenPaymentsCallback(token, pendingId)
+      .then(() => {
+        if (!active) return;
+        setHasPendingPayment(false);
+        clearPendingPayment();
+        getPublicBill(token).then(setBill).catch(() => {});
+      })
+      .catch((reason) => {
+        if (!active) return;
+        if (reason instanceof ApiError && reason.status === 409) return;
+        setHasPendingPayment(false);
+        clearPendingPayment();
+      });
+    return () => { active = false; };
+  }, [token, hasPendingPayment]);
 
   useEffect(() => {
     if (!token) return;
@@ -129,7 +189,8 @@ export default function PublicPayment() {
           sender_wallet_url: walletUrl.trim(),
         });
         // Store payment_id in localStorage so callback page can find it
-        localStorage.setItem("brivia_op_payment_id", result.payment_id);
+        localStorage.setItem(PENDING_PAYMENT_KEY, result.payment_id);
+        localStorage.setItem(PENDING_PAYMENT_AT_KEY, String(Date.now()));
         localStorage.setItem("brivia_op_share_token", token);
         // Surface the "check payment status" prompt immediately — the
         // contributor is about to leave for their wallet.

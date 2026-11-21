@@ -25,7 +25,7 @@ services:
       - key: OP_SERVER_URL
         value: https://brivia-op-server.onrender.com
       - key: OP_RECEIVING_WALLET_URL
-        value: https://ilp.interledger-test.dev/practice
+        value: https://ilp.interledger-test.dev/briviacare
 
   # ── Open Payments Server ─────────────────────────────
   - type: web
@@ -36,14 +36,16 @@ services:
     buildCommand: cd open-payments-server && npm install
     startCommand: cd open-payments-server && node server.js
     envVars:
+      # Client identity: must be a wallet address with a registered key pair
+      # (serves keys at /jwks.json). briviacare has none; the key lives here.
       - key: OP_WALLET_ADDRESS_URL
         value: https://ilp.interledger-test.dev/practice
       - key: OP_KEY_ID
-        value: 7081bbed-1e3e-416d-b4b5-981b3993be68
+        value: 4ff04aca-5ed2-4514-930f-645a2663ed50
       - key: OP_PRIVATE_KEY
         sync: false
       - key: OP_RECEIVING_WALLET_URL
-        value: https://ilp.interledger-test.dev/practice
+        value: https://ilp.interledger-test.dev/briviacare
       - key: NODE_VERSION
         value: "20"
 

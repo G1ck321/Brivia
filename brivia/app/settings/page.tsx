@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { BriviaAppShell } from "@/components/BriviaAppShell";
-import { getMe, updateProfile, changePassword, logout as apiLogout, type User as UserType } from "@/lib/api";
+import { ApiError, getMe, updateProfile, changePassword, logout as apiLogout, type User as UserType } from "@/lib/api";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -42,8 +42,13 @@ export default function SettingsPage() {
         setName(u.name);
         setFacilityName(u.facility_name || "");
       })
-      .catch(() => {
-        toast.error("Could not load your profile");
+      .catch((err) => {
+        if (err instanceof ApiError && err.status === 401) {
+          toast.error("Your session expired. Please sign in again.", { duration: 4000 });
+          router.push("/auth");
+          return;
+        }
+        toast.error("Could not load your profile", { duration: 4000 });
         router.push("/");
       })
       .finally(() => setLoading(false));

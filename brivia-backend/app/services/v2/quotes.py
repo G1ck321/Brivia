@@ -19,15 +19,22 @@ from app.services.ledger import calculate_platform_fee
 
 CURRENCIES = ["NGN", "GBP", "USD", "EUR", "KES", "GHS", "ZAR"]
 
-# Indicative NGN per 1 major unit. Only used when no live quote is available.
+# Indicative rates are anchored on one average US-dollar rate so every pair is
+# consistent: each currency's NGN value is derived through USD, never picked by
+# hand. Only used when no live quote is available.
+NGN_PER_USD = 1540.0
+USD_PER_UNIT = {
+    "USD": 1.0,
+    "GBP": 1.27,
+    "EUR": 1.08,
+    "KES": 0.0077,
+    "GHS": 0.065,
+    "ZAR": 0.055,
+}
+
 FALLBACK_NGN_PER_UNIT = {
     "NGN": 1.0,
-    "GBP": 2100.0,
-    "USD": 1650.0,
-    "EUR": 1780.0,
-    "KES": 12.8,
-    "GHS": 105.0,
-    "ZAR": 90.0,
+    **{code: NGN_PER_USD * usd for code, usd in USD_PER_UNIT.items()},
 }
 
 QUOTE_TTL_SECONDS = 300
@@ -53,6 +60,31 @@ def _rate(currency: str, bill_currency: str) -> float:
         return FALLBACK_NGN_PER_UNIT[currency] / FALLBACK_NGN_PER_UNIT[bill_currency]
     except KeyError as exc:
         raise ValueError(f"No rate available for {currency} → {bill_currency}.") from exc
+
+
+def convert_minor(
+    amount_minor: int,
+    from_currency: str,
+    to_currency: str,
+    from_scale: int = 2,
+    to_scale: int = 2,
+) -> int:
+    """Convert a minor-unit amount between two currencies with different scales.
+
+    ``amount_minor`` is in ``from_currency``'s minor units; the result is in
+    ``to_currency``'s. Used at the wallet boundary, where the bill is priced in
+    one currency but the contributor's wallet debits its own asset.
+    """
+    from_currency = supported(from_currency)
+    to_currency = supported(to_currency)
+    from_scale = int(from_scale)
+    to_scale = int(to_scale)
+    if from_currency == to_currency and from_scale == to_scale:
+        return int(amount_minor)
+
+    major = int(amount_minor) / (10 ** from_scale)
+    converted = major * _rate(from_currency, to_currency)
+    return int(round(converted * (10 ** to_scale)))
 
 
 def _build(currency: str, bill_currency: str, debit_minor: int, rate: float, source: str, note: str) -> dict:
@@ -110,23 +142,40 @@ async def preview(
         settings = get_settings()
         if settings.OP_SERVER_URL:
             try:
+                from app.services.open_payments_client import get_wallet_asset
+
+                # A wallet quotes in its own asset, so the debit must be
+                # converted from the bill's currency first.
+                asset = await get_wallet_asset(sender_wallet_url)
+                sender_code = (asset.get("asset_code") or currency).upper()
+                sender_scale = int(asset.get("asset_scale", 2))
+                debit = convert_minor(
+                    amount_minor, bill_currency, sender_code, 2, sender_scale
+                )
+
                 async with httpx.AsyncClient(timeout=20.0) as client:
                     response = await client.post(
                         f"{settings.OP_SERVER_URL.rstrip('/')}/quote-preview",
                         json={
                             "sender_wallet_url": sender_wallet_url,
                             "incoming_payment_url": incoming_payment_url,
-                            "amount_minor": amount_minor,
+                            "amount_minor": debit,
                         },
                     )
                     response.raise_for_status()
                     data = response.json()
 
-                debit = int(data.get("debit_minor") or amount_minor)
-                receive = int(data.get("receive_minor") or 0)
+                # The quote's receiveAmount is in the receiving wallet's asset.
+                receive_amount = data.get("receive_amount") or {}
+                receive_raw = int(data.get("receive_minor") or 0)
+                receive_code = (receive_amount.get("assetCode") or bill_currency).upper()
+                receive_scale = int(receive_amount.get("assetScale", 2))
+                receive = convert_minor(
+                    receive_raw, receive_code, bill_currency, receive_scale, 2
+                )
                 if receive > 0 and debit > 0:
                     quote = _build(
-                        currency,
+                        sender_code,
                         bill_currency,
                         debit,
                         receive / debit,

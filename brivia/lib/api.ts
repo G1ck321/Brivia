@@ -77,6 +77,24 @@ function getAuthToken(): string | null {
   return authToken;
 }
 
+/** An API failure that keeps the HTTP status, so callers can react to 401s. */
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+function clearSession() {
+  setAuthToken(null);
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("brivia_user");
+  }
+}
+
 async function apiRequest<T>(
   path: string,
   options: RequestInit = {}
@@ -97,7 +115,10 @@ async function apiRequest<T>(
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(error.detail || `API error ${res.status}`);
+    // An expired/invalid token should end the session instead of leaving a
+    // ghost login that only fails when a protected page is opened.
+    if (res.status === 401 && token) clearSession();
+    throw new ApiError(error.detail || `API error ${res.status}`, res.status);
   }
 
   return res.json();
@@ -313,10 +334,7 @@ export async function changePassword(data: {
 }
 
 export function logout() {
-  setAuthToken(null);
-  if (typeof window !== "undefined") {
-    localStorage.removeItem("brivia_user");
-  }
+  clearSession();
 }
 
 export { setAuthToken };

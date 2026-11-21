@@ -24,10 +24,16 @@ from app.services.ledger import apply_settlement, calculate_platform_fee
 from app.services.payment_service import initiate_contribution
 from app.services.op_grants import consume_grant, load_grant, save_grant
 from app.services.ratelimit import public_rate_limit
-from app.services.wallets import resolve_receiving_wallet
+from app.services.wallets import normalize_sender_wallet, resolve_receiving_wallet
 from app.services.v2.lines import allocate_for_payment
 from app.config.settings import get_settings
-from app.services.open_payments_client import get_op_server_url
+from app.services.open_payments_client import (
+    WalletPaymentError,
+    get_op_server_url,
+    get_wallet_asset,
+    request_outgoing_grant,
+)
+from app.services.v2.quotes import convert_minor
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +147,38 @@ async def initiate_open_payments(share_token: str, data: OpenPaymentsInitiateReq
             detail=f"Amount exceeds remaining balance of {bill['remaining_balance_minor']}."
         )
 
+    # Reject a mistyped wallet address before creating a payment row or
+    # bothering the wallet network. The message is safe to show as-is.
+    try:
+        sender_wallet_url = normalize_sender_wallet(data.sender_wallet_url)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    # The bill is priced in its own currency, but a wallet only authorises and
+    # debits its own asset. Without this conversion a ₦130,000 bill is approved
+    # as €1,300 — the wallet's screen would ask for the wrong amount.
+    debit_minor = data.amount_minor
+    try:
+        wallet_asset = await get_wallet_asset(sender_wallet_url)
+        debit_minor = convert_minor(
+            data.amount_minor,
+            bill["currency"],
+            wallet_asset["asset_code"],
+            2,
+            int(wallet_asset.get("asset_scale", 2)),
+        )
+    except Exception as exc:
+        logger.warning(
+            "Could not convert %s %s into the wallet asset of %s: %s",
+            data.amount_minor, bill["currency"], sender_wallet_url, exc,
+        )
+
+    if debit_minor <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="That amount is too small to send in your wallet's currency.",
+        )
+
     # Get or create incoming payment for this bill
     incoming_payment_id = bill.get("external_payment_id")
     if not incoming_payment_id:
@@ -173,10 +211,14 @@ async def initiate_open_payments(share_token: str, data: OpenPaymentsInitiateReq
                 "updated_at": now,
             }).eq("id", bill_id).execute()
 
-        except Exception as e:
+        except Exception as exc:
+            logger.warning("Incoming payment setup failed for bill %s: %s", bill_id, exc)
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to set up incoming payment: "
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=(
+                    "The provider's receiving wallet is unavailable right now. "
+                    "Please try again in a moment."
+                ),
             )
 
     # Create payment record
@@ -220,31 +262,29 @@ async def initiate_open_payments(share_token: str, data: OpenPaymentsInitiateReq
     frontend_origin = (settings.CORS_ORIGINS.split(",")[0] or "").strip().rstrip("/")
     callback_url = f"{frontend_origin}/pay/{share_token}/callback?payment_id={payment_id}"
     try:
-        import httpx
-        op_url = get_op_server_url()
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.post(
-                f"{op_url}/initiate-outgoing",
-                json={
-                    "sender_wallet_url": data.sender_wallet_url,
-                    "incoming_payment_url": incoming_payment_id,
-                    "amount_minor": data.amount_minor,
-                    "callback_url": callback_url,
-                },
-            )
-            resp.raise_for_status()
-            grant_result = resp.json()
-
-    except Exception as e:
+        grant_result = await request_outgoing_grant(
+            sender_wallet_url=sender_wallet_url,
+            incoming_payment_url=incoming_payment_id,
+            amount_minor=debit_minor,
+            callback_url=callback_url,
+        )
+    except WalletPaymentError as exc:
         # Mark payment as failed
         db.table("payments").update({
             "status": PaymentStatus.FAILED.value,
             "updated_at": now,
         }).eq("id", payment_id).execute()
 
+        raise HTTPException(status_code=exc.status_code, detail=exc.message)
+    except Exception as exc:
+        logger.exception("Unexpected failure initiating payment %s: %s", payment_id, exc)
+        db.table("payments").update({
+            "status": PaymentStatus.FAILED.value,
+            "updated_at": now,
+        }).eq("id", payment_id).execute()
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to initiate payment: {str(e)}"
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="We couldn't start the wallet payment. Please try again in a moment.",
         )
 
     # Durable grant continuation (op_grants, with audit_logs as fallback)
@@ -255,7 +295,8 @@ async def initiate_open_payments(share_token: str, data: OpenPaymentsInitiateReq
         "quote_id": grant_result.get("quote_id"),
         "bill_id": bill_id,
         "incoming_payment_id": incoming_payment_id,
-        "sender_wallet_url": data.sender_wallet_url,
+        "debit_minor": debit_minor,
+        "sender_wallet_url": sender_wallet_url,
         "callback_url": callback_url,
         "finish_nonce": grant_result.get("finish_nonce"),
     })
@@ -367,7 +408,7 @@ async def open_payments_callback(
                             "continue_token": metadata["continue_token"],
                             "sender_wallet_url": sender_wallet_url,
                             "incoming_payment_id": incoming_payment_id,
-                            "amount_minor": payment["amount_minor"],
+                            "amount_minor": metadata.get("debit_minor") or payment["amount_minor"],
                             "description": "Brivia bill contribution",
                             "interact_ref": interact_ref,
                         },
@@ -396,6 +437,7 @@ async def open_payments_callback(
 
         received_amount = 0
         receive_amount = op_payment_result.get("receive_amount") if op_payment_result else None
+        received_asset = receive_amount if isinstance(receive_amount, dict) else None
         if isinstance(receive_amount, dict):
             received_amount = int(receive_amount.get("value") or 0)
 
@@ -417,6 +459,7 @@ async def open_payments_callback(
                     polled_amount = poll_result.get("received_amount")
                     if isinstance(polled_amount, dict):
                         received_amount = int(polled_amount.get("value") or 0)
+                        received_asset = polled_amount
             except Exception as exc:
                 logger.warning("Settlement polling failed for payment %s: %s", payment_id, exc)
 
@@ -425,6 +468,25 @@ async def open_payments_callback(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Payment was sent but the network is still settling. Please wait.",
             )
+
+        # The wallet network settles in the receiving wallet's asset (for
+        # example GBP), while the bill and its ledger are in the bill's own
+        # currency. Crediting pennies as kobo would corrupt the balance.
+        received_bill_minor = received_amount
+        if received_asset:
+            try:
+                received_bill_minor = convert_minor(
+                    received_amount,
+                    received_asset.get("assetCode") or payment.get("currency") or "NGN",
+                    payment.get("currency") or "NGN",
+                    int(received_asset.get("assetScale", 2)),
+                    2,
+                )
+            except ValueError as exc:
+                logger.warning(
+                    "Could not convert %s received by payment %s into %s: %s",
+                    received_amount, payment_id, payment.get("currency"), exc,
+                )
 
         current_bill_result = db.table("bills").select("*").eq("id", bill_id).limit(1).execute()
         if not current_bill_result.data:
@@ -435,7 +497,7 @@ async def open_payments_callback(
             bill=current_bill_result.data[0],
             payment_id=payment_id,
             gross_amount_minor=payment["amount_minor"],
-            received_amount_minor=received_amount,
+            received_amount_minor=received_bill_minor,
             actor_id=None,
             currency=payment.get("currency"),
         )
@@ -474,7 +536,7 @@ async def open_payments_callback(
                 created_at=pay_row["created_at"],
             ),
             bill_status=new_bill_status,
-            received_amount=received_amount,
+            received_amount=received_bill_minor,
             gross_amount=payment["amount_minor"],
             platform_fee=platform_fee,
             net_amount=net_amount,

@@ -19,7 +19,23 @@ import { randomUUID } from "node:crypto";
 import OpenPayments from "@interledger/open-payments";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// Load the .env that sits next to this file when the process wasn't started
+// with `--env-file`. Without this, `node server.js` silently ignored the
+// configured key id and wallets and signed requests with stale testnet
+// defaults, which the auth server rejects with `invalid_client`.
+const SERVER_DIR = dirname(fileURLToPath(import.meta.url));
+const ENV_FILE = join(SERVER_DIR, ".env");
+if (existsSync(ENV_FILE) && typeof process.loadEnvFile === "function") {
+  try {
+    process.loadEnvFile(ENV_FILE);
+    console.log(`Loaded configuration from ${ENV_FILE}`);
+  } catch (error) {
+    console.warn(`Could not load ${ENV_FILE}: ${error.message}`);
+  }
+}
 
 // NOTE: NODE_TLS_REJECT_UNAUTHORIZED should NOT be disabled in production.
 // Only disable for local testnet testing if needed, via env var:
@@ -57,8 +73,17 @@ function getPrivateKey() {
 
     // Validate PEM format
     if (!key.includes("-----BEGIN ")) {
-      console.error("Private key does not start with -----BEGIN. First 50 chars:", key.substring(0, 50));
-      throw new Error("OP_PRIVATE_KEY is not in PEM format. Must start with -----BEGIN PRIVATE KEY-----");
+      // Some dashboards / env pastes hand over the raw base64 of the PKCS#8
+      // DER body without the PEM header lines. Wrap it instead of crashing.
+      const compact = key.replace(/\s+/g, "");
+      if (/^[A-Za-z0-9+/]+={0,2}$/.test(compact) && compact.length >= 60) {
+        const body = compact.match(/.{1,64}/g) || [];
+        key = `-----BEGIN PRIVATE KEY-----\n${body.join("\n")}\n-----END PRIVATE KEY-----\n`;
+        console.log("Wrapped bare base64 key in PEM headers");
+      } else {
+        console.error("Private key does not start with -----BEGIN. First 50 chars:", key.substring(0, 50));
+        throw new Error("OP_PRIVATE_KEY is not in PEM format. Must start with -----BEGIN PRIVATE KEY-----");
+      }
     }
     console.log("Private key looks valid (PEM format detected)");
     return key;
@@ -80,7 +105,13 @@ const grantStore = new Map();
 // --- Create client ---
 let client = null;
 
-const TESTNET_WALLET = "https://ilp.interledger-test.dev/practice";
+// The client identity is the wallet whose registered key pair signs every
+// request, so its address MUST serve keys at /jwks.json (otherwise the auth
+// server answers `invalid_client: could not determine client`). The
+// briviacare address currently has no keys; the deployed key lives on
+// "practice". Set OP_WALLET_ADDRESS_URL to use another client wallet.
+const TESTNET_CLIENT_WALLET = "https://ilp.interledger-test.dev/briviacare";
+const TESTNET_RECEIVING_WALLET = "https://ilp.interledger-test.dev/briviacare";
 
 function getEffectiveWalletUrl(configured, fallback) {
   return configured || fallback;
@@ -89,8 +120,14 @@ function getEffectiveWalletUrl(configured, fallback) {
 async function getClient() {
   if (client) return client;
   const privateKey = getPrivateKey();
-  const walletUrl = getEffectiveWalletUrl(WALLET_ADDRESS_URL, TESTNET_WALLET);
-  const keyId = KEY_ID || "7081bbed-1e3e-416d-b4b5-981b3993be68";
+  const walletUrl = getEffectiveWalletUrl(WALLET_ADDRESS_URL, TESTNET_CLIENT_WALLET);
+  if (!KEY_ID) {
+    throw new Error(
+      "OP_KEY_ID is not set. Add it to open-payments-server/.env — a missing key id " +
+        "used to fall back to a revoked testnet key, which the auth server rejects with invalid_client."
+    );
+  }
+  const keyId = KEY_ID;
   console.log(`[client] wallet=${walletUrl} keyId=${keyId}`);
   client = await createAuthenticatedClient({
     walletAddressUrl: walletUrl,
@@ -148,6 +185,14 @@ async function handleRequest(req, res) {
       return;
     }
 
+    // --- POST /wallet-info ---
+    if (url.pathname === "/wallet-info") {
+      const { wallet_address_url } = body;
+      const result = await walletInfo(wallet_address_url);
+      respond(res, 200, result);
+      return;
+    }
+
     // --- POST /initiate-outgoing ---
     if (url.pathname === "/initiate-outgoing") {
       const { sender_wallet_url, incoming_payment_url, amount_minor, callback_url } = body;
@@ -185,15 +230,36 @@ async function handleRequest(req, res) {
     res.end(JSON.stringify({ error: "Not found" }));
 
   } catch (err) {
+    // OpenPaymentsClientError keeps the authorization server's answer in
+    // `description` (and `status` / `code`), not in `body`. Without these the
+    // caller only ever sees "Error making Open Payments POST request".
+    const description =
+      typeof err.description === "string"
+        ? err.description
+        : err.body ?? (err.description ? JSON.stringify(err.description) : null);
+    const status = err.status ?? null;
+    const code = typeof err.code === "string" ? err.code : null;
     console.error("Error:", err.message);
+    if (status) console.error("Status:", status);
+    if (code) console.error("Code:", code);
+    if (description) console.error("Description:", description);
     console.error("Stack:", err.stack);
-    if (err.body) console.error("Body:", JSON.stringify(err.body));
     res.writeHead(500, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: err.message, detail: err.body || null }));
+    res.end(JSON.stringify({ error: err.message, detail: description, status, code }));
   }
 }
 
 // --- Payment flow functions ---
+
+async function walletInfo(walletUrl) {
+  const c = await getClient();
+  const wallet = await c.walletAddress.get({ url: walletUrl });
+  return {
+    wallet_address: wallet.id,
+    asset_code: wallet.assetCode,
+    asset_scale: wallet.assetScale,
+  };
+}
 
 async function setupIncomingPayment(receiverWalletUrl, amountMinor, reference) {
   const c = await getClient();
@@ -432,7 +498,7 @@ async function pollSettlement(incomingPaymentUrl, maxAttempts = 30, intervalMs =
       // This requires an access token - in production, store it
       // For now, we'll return the current state
       const wallet = await c.walletAddress.get({
-        url: getEffectiveWalletUrl(RECEIVING_WALLET_URL, TESTNET_WALLET),
+        url: getEffectiveWalletUrl(RECEIVING_WALLET_URL, TESTNET_RECEIVING_WALLET),
       });
 
       const grant = await c.grant.request(
